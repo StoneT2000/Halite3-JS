@@ -150,9 +150,7 @@ game.initialize().then(async () => {
             //FOR NOW if halitthere === 0 still, jsut move randomly
             if (haliteThere === 0) {
               logging.info(`ID: ${id} at ${ship.position} can move to: ${unoccupiedPositions}`);
-              if (unoccupiedPositions.length > 0){
-                destination = unoccupiedPositions[Math.floor(unoccupiedPositions.length * Math.random())];
-              }
+              destination = unoccupiedPositions[Math.floor(unoccupiedPositions.length * Math.random())];
             }
             
             ships[id].mode = 'search';
