@@ -17,14 +17,21 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('SM Bot Test');
+  await game.ready('SM-Bot Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
   const {gameMap, me} = game;
   let mapSize = gameMap.width * gameMap.height;
   let numShips = 0;
   let numDropoffs = 1;
+  let maxDropoffs = 1;
   logging.info(`Map Size: ${mapSize}`);
+  if (mapSize > 2500) {
+    maxDropoffs = 3;
+  }
+  else if (mapSize > 2000) {
+    maxDropoffs = 2;
+  }
   while (true) {
     let start = new Date().getTime();
     let shipCommands = {};
@@ -111,7 +118,7 @@ game.initialize().then(async () => {
       else if (gameMap.get(ship.position).hasStructure) {
         ships[id].mode = 'leaveAnywhere';
       }
-      else if (numDropoffs < 1 && localHaliteCount >= hlt.constants.DROPOFF_COST) {
+      else if (numDropoffs < maxDropoffs && localHaliteCount >= hlt.constants.DROPOFF_COST) {
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
         let dist = gameMap.calculateDistance(ship.position, nearestDropoff.position);
         let distShipyard = gameMap.calculateDistance(ship.position, me.shipyard.position);

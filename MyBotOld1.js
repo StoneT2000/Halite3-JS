@@ -1,7 +1,6 @@
 const hlt = require('./hlt');
 const { Direction, Position } = require('./hlt/positionals');
 const logging = require('./hlt/logging');
-const mining = require('./miningOld.js')
 //const manhattanDeltas = require('./manhattanDeltas.js')
 const manhattanDeltas = {
   0: [[0,0]],
@@ -20,11 +19,12 @@ const game = new hlt.Game();
 //target destinations holds ship ids as keys with position object as values
 let idealDropOffLocs = {};
 let ships = {};
+let structures = {};
 game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('OldBot');
+  await game.ready('TopBot');
   
   //Search for dense clusters of halite
   
@@ -42,6 +42,16 @@ game.initialize().then(async () => {
 
     const commandQueue = [];
     
+    //Number of bots running in a straight line to the shipyard or dropoff
+    let upLine = 0;
+    let leftLine = 0;
+    let rightLine = 0;
+    let downLine = 0;
+    structures = {};
+    structures[me.shipyard.id] = {upLine: 0, leftLine: 0, rightLine: 0, downLine: 0}
+    for (const dropoff in me.getDropoffs()) {
+      
+    }
     for (const ship of me.getShips()) {
       let id = ship.id;
       
@@ -58,7 +68,10 @@ game.initialize().then(async () => {
         //MODES:
         //mine = mining
         //search = not mining, just moving to find halite sources and move out of the way
+        //return = going to a dropoff point
+        //build = going to a place to build and building
         ships[id].mode = 'mine';
+        ships[id].targetDropoffId = -1;
       }
       //If destination reached, set ships[id].targetDestination to null
       //logging.info(`${ship.position} = ${ships[id].targetDestination}`);
@@ -73,7 +86,10 @@ game.initialize().then(async () => {
       
       //SHIP always has a target destination that must be set. Ship will always move safely towards target destination if possible. Add strats for sinking later
       
+      
+      
       //Potential halite to be earned this turn if still
+      
       let haliteHere = gameMap.get(ship.position).haliteAmount;
       let halitePotential = haliteHere * extractPercent;
       let haliteMoveCost = haliteHere * moveCostPercent;
@@ -90,12 +106,14 @@ game.initialize().then(async () => {
         if (ship.haliteAmount > hlt.constants.MAX_HALITE / 1.1) {
           //change /2 to like /1.2
           //with enough halite, send ship to nearest drop off point safely. 
-          
+          ships[id].mode = 'return';
           //If target dest. not set, set it
           if (ships[id].targetDestination === null) {
           //replace with find nearest thing
-            const dropOffDestination = me.shipyard.position;
-            ships[id].targetDestination = dropOffDestination;
+            let temp = positionAndDistOfNearestDropoff(gameMap, me, ship.position);
+            const dropoffDestination = temp.position;
+            ships[id].targetDestination = dropoffDestination;
+            ships[id].targetDropoffId = temp.id;
           }
         }
         
@@ -175,7 +193,12 @@ game.initialize().then(async () => {
           if (ships[id].targetDestination !== null) {
             logging.info(`Ship-ID: ${id} | Destination: ${ships[id].targetDestination}`)
             //FINALIZE MOVEMENTS
-            let safeMove = gameMap.naiveNavigate(ship, ships[id].targetDestination);
+            let safeMove = Direction.Still;
+
+            safeMove = gameMap.naiveNavigate(ship, ships[id].targetDestination);
+
+            
+            
             //logging.info(`ID:${id} at ${ship.position} safeMove: ${safeMove}`);
             if (safeMove === Direction.Still && (ships[id].mode !== 'mine' || gameMap.get(ship.position).haliteAmount === 0)){
               //If ship isn't mining or there is 0 halite, force ship to move away to an unoccupied position
@@ -183,6 +206,22 @@ game.initialize().then(async () => {
               if (unoccupiedPositions.length){
                 safeMove = gameMap.naiveNavigate(ship, unoccupiedPositions[Math.floor(unoccupiedPositions.length * Math.random())]);
               }
+              /*
+              else {
+                const direction = Direction.getAllCardinals()[Math.floor(4 * Math.random())];
+                //regardless of who is there, move there (if enemy, destory it!)
+                safeMove = direction;
+                targetPos = ship.position.directionalOffset(direction);
+                gameMap.get(targetPos).markUnsafe(ship);
+                let otherShip = gameMap.get(targetPos).ship;
+                if (otherShip.owner === ship.owner){
+                  commandQueue.push(otherShip.move(safeMove.invert());
+                };
+                
+              }
+              */
+              //If there aren't any unoccupied positions, perform a swap with a ship
+              
             }
             commandQueue.push(ship.move(safeMove));
 
@@ -224,6 +263,7 @@ game.initialize().then(async () => {
             //ships[id].distanceLeftToDestination -= 1;
           }
           else {
+            
             const safeMove = gameMap.naiveNavigate(ship, ships[id].targetDestination);
             if (safeMove === Direction.still) {
               ships[id].aboutToMove = false;
@@ -246,7 +286,7 @@ game.initialize().then(async () => {
 
     }
 
-    if (game.turnNumber < 0.75 * hlt.constants.MAX_TURNS &&
+    if (game.turnNumber < 0.45 * hlt.constants.MAX_TURNS &&
       me.haliteAmount >= hlt.constants.SHIP_COST &&
       !gameMap.get(me.shipyard).isOccupied) {
       let positionsToCheck = circle(gameMap, me.shipyard.position, 1);
@@ -284,14 +324,16 @@ function positionAndDistOfNearestDropoff(gameMap, player, sourcePos) {
   
   let dist = gameMap.calculateDistance(sourcePos, player.shipyard.position);
   let dropoffs = player.getDropoffs();
+  let targetDropId = player.shipyard.id;
   let targetPos = player.shipyard.position;
-  for (dropoff in dropoffs) {
+  for (const dropoff in dropoffs) {
     let newdist = gameMap.calculateDistance(sourcePos, dropoff.position);
     if (newdist < dist) {
       targetPos = dropoff.position;
+      targetDropId = dropoff.id;
     }
   }
-  return {position:targetPos, distance:dist};
+  return {position:targetPos, distance:dist, id:targetDropId};
 }
 function canMove(gameMap, ship) {
   if (ship.haliteAmount >= gameMap.get(ship.position).haliteAmount * 0.1) {
