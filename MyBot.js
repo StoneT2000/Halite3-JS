@@ -287,7 +287,7 @@ game.initialize().then(async () => {
 
     }
 
-    if (game.turnNumber < 0.75 * hlt.constants.MAX_TURNS &&
+    if (game.turnNumber < 0.45 * hlt.constants.MAX_TURNS &&
       me.haliteAmount >= hlt.constants.SHIP_COST &&
       !gameMap.get(me.shipyard).isOccupied) {
       let positionsToCheck = circle(gameMap, me.shipyard.position, 1);

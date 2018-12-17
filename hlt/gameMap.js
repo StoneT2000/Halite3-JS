@@ -319,9 +319,11 @@ class GameMap {
         }
     }
 }
+const extractPercent = 1/constants.EXTRACT_RATIO;
 
 module.exports = {
     Player,
     GameMap,
     MapCell,
+    extractPercent,
 };
