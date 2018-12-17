@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./halite --replay-directory replays/ -vvv --width 62 --height 62 "node MyBot.js" "node baseBot.js"
+./halite --replay-directory replays/ -vvv --width 32 --height 32 "node MyBot.js" "node MyBotOld.js"
