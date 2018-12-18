@@ -17,9 +17,10 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
   let newHalitePotential = -haliteMoveCost;
   let currentHalitePotential = halitePotential(gameMap, ship.position, kTurns);
   let id = ship.id;
-  let possibleDestinations = search.circle(gameMap, ship.position, 2);
+  let possibleDestinations = search.circle(gameMap, ship.position, 3);
   let possibleDestinations1 = possibleDestinations.slice(1, 5);
   let possibleDestinations2 = possibleDestinations.slice(5, 13);
+  let possibleDestinations3 = possibleDestinations.slice(13, 29);
   let bestNewHaliteDestination = ship.position;
   
   if (range >= 1){
@@ -56,6 +57,26 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
         if (thisHalitePotential > newHalitePotential) {
           newHalitePotential = thisHalitePotential;
           bestNewHaliteDestination = possibleDestinations2[i];
+          logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
+        }
+      }
+    }
+  }
+  if (range >=3){
+    for (let i = 0; i < possibleDestinations3.length; i++) {
+      let newTile = gameMap.get(possibleDestinations3[i]);
+      if (!newTile.isOccupied && !newTile.hasStructure){
+        //unoccupiedPositions.push(possibleDestinations[i]);
+
+        let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations3[i], kTurns - 6);
+        let thisHaliteStart = newTile.haliteAmount;
+        let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent; //not accurate, we omit the cost to move over the tile we don't mine
+
+        //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
+
+        if (thisHalitePotential > newHalitePotential) {
+          newHalitePotential = thisHalitePotential;
+          bestNewHaliteDestination = possibleDestinations3[i];
           logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
         }
       }

@@ -159,7 +159,7 @@ game.initialize().then(async () => {
         if (ships[id].targetDestination.equals(ship.position)) {
           ships[id].mode = 'none';
           ships[id].targetDestination = null;
-          //logging.info(`Ship-${id} reached dest: has no mode`);
+          logging.info(`Ship-${id} reached dest: has no mode`);
         }
       }
       

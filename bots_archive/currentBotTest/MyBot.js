@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('Current Test: SM-Bot2 Dec-18');
+  await game.ready('Current Bot Test: SM-Bot3 Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
   const {gameMap, me} = game;
@@ -77,8 +77,8 @@ game.initialize().then(async () => {
        meta = 'final';
     }
     if (game.turnNumber >= 0.3 * hlt.constants.MAX_TURNS) {
-      shipMineRange = 2;
-      shipNumFutureTurnsToCalc = 6;
+      shipMineRange = 3;
+      shipNumFutureTurnsToCalc = 8; //shoudl equal range*2 + 2
     }
     
     //tempId is assigned to about to be made ships
@@ -167,7 +167,7 @@ game.initialize().then(async () => {
       //DETERMINE SHIP MODE:
       
       //Returning mode if there is enough halite store.
-      if (ship.haliteAmount > hlt.constants.MAX_HALITE / 1.1 || ships[id].mode === 'return') {
+      if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || ships[id].mode === 'return') {
         ships[id].mode = 'return';
       }
       
@@ -188,7 +188,7 @@ game.initialize().then(async () => {
           for (let p = 0; p < idealDropOffLocs.length; p++){
             if (ship.position.equals(idealDropOffLocs[p])) {
               let haliteInRadius9 = mining.totalHaliteInRadius(gameMap, ship.position, 6); //possibly expensive
-              if (haliteInRadius9 >= 14000) {
+              if (haliteInRadius9 >= 18000) {
                 ships[id].mode = 'buildDropoff';
                 localHaliteCount -= 4000;
               }
