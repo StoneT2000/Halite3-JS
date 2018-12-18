@@ -77,7 +77,7 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
         if (thisHalitePotential > newHalitePotential) {
           newHalitePotential = thisHalitePotential;
           bestNewHaliteDestination = possibleDestinations3[i];
-          logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
+          //logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
         }
       }
     }
@@ -87,8 +87,9 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
     omp = ship.position;
   }
   //No halite anywhere within 1 unit? Expand search
-  else if (currentHalitePotential === 0 && newHalitePotential === 0) {
-    let possibleDestinationsExpanded = search.circle(gameMap, ship.position, 4);
+  else if ((currentHalitePotential === 0 && newHalitePotential === 0) || (currentHalitePotential + newHalitePotential <= 20)) {
+    //the additional or was added without huge reason, fix it later
+    let possibleDestinationsExpanded = search.circle(gameMap, ship.position, 8);
     let haliteThere = 0;
     //This code can be reduced, consider only searching the latter part of the possible destinations as the former part is already checked to = 0;
     for (let i = 0; i < possibleDestinationsExpanded.length; i++) {
@@ -102,7 +103,7 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
     }
     //If no halite nearby
     if (haliteThere === 0){
-      bestNewHaliteDestination = possibleDestinationsExpanded[Math.floor(Math.random()*4) + 1];
+      bestNewHaliteDestination = possibleDestinationsExpanded[Math.floor(Math.random()*(possibleDestinationsExpanded.length - 1)) + 1];
     }
     omp = bestNewHaliteDestination;
   }

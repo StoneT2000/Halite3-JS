@@ -70,6 +70,7 @@ function findNearestDropoff(gameMap, player, sourcePos) {
     if (newdist < dist) {
       //targetPos = dropoff.position;
       //targetDropId = dropoff.id;
+      dist = newdist;
       nearestStructure = dropoff;
     }
   }

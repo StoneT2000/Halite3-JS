@@ -17,10 +17,12 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('Current Bot Test: SM-Bot3 Dec-18');
+  await game.ready('Current Test: SM-Bot3 Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
+  
   const {gameMap, me} = game;
+  
   let mapSize = gameMap.width * gameMap.height;
   let numShips = 0;
   let numDropoffs = 1;
@@ -39,17 +41,34 @@ game.initialize().then(async () => {
       let thisAmount = gameMap.get(new Position(i,j)).haliteAmount;
       if (thisAmount > averageHalite * 2 || thisAmount > 600) {
         idealDropOffLocs.push(new Position(i,j));
-        logging.info(`ideal Loc: (${i},${j})`);
+        //logging.info(`ideal Loc: (${i},${j})`);
       }
     }
   }
   
   //How far ship is willing to look for potential mining spots. early game, its 1, we want more ships early on
   //later set it to two
+  
+  //short range is good if the halite is well evened out
+  //long range is good if there are deep clusters far away and no good halite nearby.
   let shipMineRange = 1;
   
   let shipNumFutureTurnsToCalc = 4;
   
+  
+  //global meta for how far ships should look for mining. Probably should do this on a case by case basis though.
+  let mineRangeMeta = 'short';
+  
+  //If there's not enough in proximity
+  let initialHaliteInProximity = mining.totalHaliteInRadius(gameMap, me.shipyard.position, 3);
+  if (initialHaliteInProximity <= 1000) {
+    logging.info(`LONG RANGE MINING`)
+    mineRangeMeta = 'long';
+  }
+  else {
+    logging.info(`SHORT RANGE MINING`)
+    mineRangeMeta = 'short';
+  }
   logging.info(`Map Size: ${mapSize}`);
   if (mapSize > 2500) {
     maxDropoffs = 3;
@@ -64,6 +83,7 @@ game.initialize().then(async () => {
     let shipDesiredPositions = {};
     
     
+    
     await game.updateFrame();
 
     
@@ -76,17 +96,29 @@ game.initialize().then(async () => {
     if (game.turnNumber >= 0.93 * hlt.constants.MAX_TURNS) {
        meta = 'final';
     }
-    if (game.turnNumber >= 0.3 * hlt.constants.MAX_TURNS) {
+    
+    //Long range mining if the clusters are sparse
+    if (game.turnNumber <= 0.3 * hlt.constants.MAX_TURNS) {
+      if (mineRangeMeta === 'short'){
+        shipMineRange = 1;
+        shipNumFutureTurnsToCalc = 4;
+      }
+      else if (mineRangeMeta === 'long'){
+        shipMineRange = 3;
+        shipNumFutureTurnsToCalc = 8; //shoudl equal range*2 + 2
+      }
+
+    }
+    else {
       shipMineRange = 3;
-      shipNumFutureTurnsToCalc = 8; //shoudl equal range*2 + 2
+      shipNumFutureTurnsToCalc = 8;
     }
     
     //tempId is assigned to about to be made ships
     let tempId = -10;
     let localHaliteCount = me.haliteAmount;
     if ((game.turnNumber < 0.55 * hlt.constants.MAX_TURNS && numShips <= Math.sqrt(mapSize)) &&
-      me.haliteAmount >= hlt.constants.SHIP_COST &&
-      !gameMap.get(me.shipyard).isOccupied ) {
+      me.haliteAmount >= hlt.constants.SHIP_COST && !gameMap.get(me.shipyard).isOccupied ) {
       let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
       let open = 5;
       for (let i = 0; i < positionsToCheck.length; i++) {
@@ -159,7 +191,7 @@ game.initialize().then(async () => {
         if (ships[id].targetDestination.equals(ship.position)) {
           ships[id].mode = 'none';
           ships[id].targetDestination = null;
-          logging.info(`Ship-${id} reached dest: has no mode`);
+          //logging.info(`Ship-${id} reached dest: has no mode`);
         }
       }
       
