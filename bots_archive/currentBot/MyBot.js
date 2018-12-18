@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('Current Bot: SM-Bot Dec-18');
+  await game.ready('Current Bot: SM-Bot2 Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
   const {gameMap, me} = game;
@@ -109,25 +109,7 @@ game.initialize().then(async () => {
     for (const ship of me.getShips()){
       let id = ship.id;
       
-      //First set the desired positions of units who can't move cuz they have no halite or something
-      if (movement.canMove(gameMap, ship)) {
-      }
-      else {
-        let directions = [Direction.Still];
-        shipDirections[id] = directions;
-        shipDesiredPositions[id] = [];
-        for (let j = 0; j < directions.length; j++) {
-          shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
-        }
-
-      }
-    }
-    
-    //Decide on movement
-    for (const ship of me.getShips()) {
-      numShips += 1;
-      let id = ship.id;
-
+      //make sure variables are defined
       if (ships[id] === undefined) {
         ships[id] = {};
         if (ships[id].targetDestination === undefined) {
@@ -139,6 +121,39 @@ game.initialize().then(async () => {
         ships[id].mode = 'mine';
         ships[id].targetDropoffId = -1;
       }
+      
+      
+      //First set the desired positions of units who can't move cuz they have no halite or something
+      if (movement.canMove(gameMap, ship)) {
+        //If unit is currently returning, 
+      }
+      else {
+        let directions = [Direction.Still];
+        shipDirections[id] = directions;
+        shipDesiredPositions[id] = [];
+        for (let j = 0; j < directions.length; j++) {
+          shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
+        }
+
+      }
+    }
+    let prioritizedShips = [];
+    for (const ship of me.getShips()){
+      let id = ship.id
+      if (ships[id].mode === 'return') {
+        prioritizedShips.unshift(ship);
+      }
+      else {
+        prioritizedShips.push(ship);
+      }
+    }
+    //Decide on movement
+    //Should be decided in order of priority
+    for (const ship of prioritizedShips) {
+      numShips += 1;
+      let id = ship.id;
+
+      
       
       if (ships[id].targetDestination !== null) {
         if (ships[id].targetDestination.equals(ship.position)) {
