@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('SM-Bot Dec-18 Old');
+  await game.ready('SM-Bot Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
   const {gameMap, me} = game;
@@ -25,11 +25,29 @@ game.initialize().then(async () => {
   let numShips = 0;
   let numDropoffs = 1;
   let maxDropoffs = 1;
+  let averageHalite = 0;
+  let idealDropOffLocs = [];
+  for (let i = 0; i < gameMap.width; i++) {
+    for (let j = 0; j < gameMap.width; j++) {
+      averageHalite += gameMap.get(new Position(i,j)).haliteAmount;
+    }
+  }
+  averageHalite = averageHalite / mapSize;
+  logging.info(`Average Halite: ${averageHalite}`);
+  for (let i = 0; i < gameMap.width; i++) {
+    for (let j = 0; j < gameMap.width; j++) {
+      let thisAmount = gameMap.get(new Position(i,j)).haliteAmount;
+      if (thisAmount > averageHalite * 5 || thisAmount > 600) {
+        idealDropOffLocs.push(new Position(i,j));
+        logging.info(`ideal Loc: (${i},${j})`);
+      }
+    }
+  }
   logging.info(`Map Size: ${mapSize}`);
   if (mapSize > 2500) {
     maxDropoffs = 3;
   }
-  else if (mapSize > 2000) {
+  else if (mapSize > 1600) {
     maxDropoffs = 2;
   }
   while (true) {
@@ -109,6 +127,7 @@ game.initialize().then(async () => {
         ships[id].targetDropoffId = -1;
       }
       //DETERMINE SHIP MODE:
+      ships[id].mode ='mine';
       if (ship.haliteAmount > hlt.constants.MAX_HALITE / 1.1) {
         ships[id].mode = 'return';
       }
@@ -123,12 +142,16 @@ game.initialize().then(async () => {
         let dist = gameMap.calculateDistance(ship.position, nearestDropoff.position);
         let distShipyard = gameMap.calculateDistance(ship.position, me.shipyard.position);
         //let dropoffPotential = 
-        if (dist >= 2 * Math.sqrt(mapSize)/4){
-          ships[id].mode = 'buildDropoff';
-          localHaliteCount -= 4000;
-        }
-        else {
-          ships[id].mode ='mine';
+        if (dist >= 2 * 6){
+          for (let p = 0; p < idealDropOffLocs.length; p++){
+            if (ship.position.equals(idealDropOffLocs[p])) {
+              ships[id].mode = 'buildDropoff';
+              localHaliteCount -= 4000;
+            }
+          }
+          
+          //ships[id].mode = 'buildDropoff';
+          
         }
       }
       else {
