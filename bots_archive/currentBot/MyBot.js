@@ -167,7 +167,7 @@ game.initialize().then(async () => {
       //DETERMINE SHIP MODE:
       
       //Returning mode if there is enough halite store.
-      if (ship.haliteAmount > hlt.constants.MAX_HALITE / 1.1 || ships[id].mode === 'return') {
+      if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || ships[id].mode === 'return') {
         ships[id].mode = 'return';
       }
       
@@ -188,7 +188,7 @@ game.initialize().then(async () => {
           for (let p = 0; p < idealDropOffLocs.length; p++){
             if (ship.position.equals(idealDropOffLocs[p])) {
               let haliteInRadius9 = mining.totalHaliteInRadius(gameMap, ship.position, 6); //possibly expensive
-              if (haliteInRadius9 >= 14000) {
+              if (haliteInRadius9 >= 18000) {
                 ships[id].mode = 'buildDropoff';
                 localHaliteCount -= 4000;
               }
