@@ -30,10 +30,14 @@ game.initialize().then(async () => {
   let averageHalite = 0;
   let idealDropOffLocs = [];
   let attackMode = true; //allow semi-intentional collisions with opponent
-  
-  if (game.players.length === 4){
-    attackMode = false;
-    logging.info(`No Attacking`)
+  let numPlayers = 0;
+  for (let key of game.players){
+    numPlayers += 1;
+  }
+  logging.info(`There are ${numPlayers} players`);
+  if (numPlayers === 4){
+    attackMode = true;
+    logging.info(`Ships can atttack`)
   }
   else {
     logging.info(`Ships can attack`)
