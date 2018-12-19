@@ -1,9 +1,10 @@
 <script src="jquery-3.3.1.min.js"></script>
-<script src="../output.json"></script>
+<script src="output.json"></script>
 <script>
   var wins = {};
   var totalGames = data.length;
   var winRatios = {};
+  var gameResults = [];
   var numPlayers = 0;
   if(data.length > 0) {
     for (key in data[0].stats){
@@ -14,11 +15,23 @@
     console.log("There are " + numPlayers + " players")
     for (let i = 0; i < data.length; i++) {
       let gameData = data[i];
+      let botWinners = [];
+      let terminatedBots = [];
+      let gameScores = [];
       for (let key in gameData.stats) {
+        let rank = gameData.stats[key].rank;
         if (gameData.stats[key].rank === 1) {
           wins[key] += 1;
         }
+        botWinners[rank-1] = key;
+        gameScores[rank-1] = gameData.stats[key].score;
       }
+      for (let key in gameData.terminated){
+        if (gameData.terminated[key] === true){
+          terminatedBots.push(key);
+        }
+      }
+      gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores});
     }
     for (key in data[0].stats){
       winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
@@ -29,6 +42,27 @@
     document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
     for (key in winRatios) {
       $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td></tr>")
+    }
+    for (let i = 0; i < gameResults.length; i++) {
+      let formattedRanks = "";
+      let formattedTerminated = "";
+      let formattedScores = "";
+      for (let j = 0; j < gameResults[i].ranks.length; j++) {
+        formattedRanks += (j+1) + ": " + gameResults[i].ranks[j]
+        if (j < gameResults[i].ranks.length-1) {
+          formattedRanks += "<br>"
+        }
+      }
+      for (let j = 0; j < gameResults[i].scores.length; j++) {
+        formattedScores += /*(j+1) + ": " + */ gameResults[i].scores[j]
+        if (j < gameResults[i].ranks.length-1) {
+          formattedScores += "<br>"
+        }
+      }
+      for (let j = 0; j < gameResults[i].terminated.length; j++) {
+        formattedTerminated += gameResults[i].terminated[j];
+      }
+      $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>" + formattedTerminated + "</td></tr>")
     }
   });
 </script>
@@ -42,7 +76,7 @@
     max-width: 80%;
     margin-left:10%;
   }
-  #stats_for_nerds_table {
+  table {
   margin: auto;
   border-spacing:0px;
   border: 2px solid #343a40;
@@ -50,12 +84,12 @@
   font-family: 'Open Sans', sans-serif;
 }
 
-#stats_for_nerds_table tr {
+ tr {
   margin:0px;
   padding:0px;
 }
 
-#stats_for_nerds_table th {
+  th {
   padding: 10px;
   font-size: 25px;
   color: white;
@@ -67,7 +101,7 @@
   border-left: 2px solid #343a40;
 
 }
-#stats_for_nerds_table td {
+td {
   color:#343a40;
   border-bottom: 2px solid #343a40;
   padding: 6px;
@@ -83,6 +117,12 @@
       <th>Bot #</th>
       <th>Wins</th>
       <th>Win Ratio</th>
+    </table>
+    <table id="games_table">
+      <th>Game #</th>
+      <th>Ranks</th>
+      <th>Scores</th>
+      <th>Terminated Bots</th>
     </table>
   </div>
 </body>
