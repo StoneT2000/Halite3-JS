@@ -110,8 +110,8 @@ game.initialize().then(async () => {
 
     }
     else {
-      shipMineRange = 3;
-      shipNumFutureTurnsToCalc = 8;
+      shipMineRange = 2;
+      shipNumFutureTurnsToCalc = 6;
     }
     
     //tempId is assigned to about to be made ships
@@ -269,6 +269,13 @@ game.initialize().then(async () => {
               */
             case 'mine':
               //Every turn its trying to mine, check for most optimal mining position
+              /*
+              let hl = mining.totalHaliteInRadius(gameMap, ship.position, 1);
+              if (hl < 100) {
+                shipMineRange = 5;
+                shipNumFutureTurnsToCalc = 12;
+              }
+              */
               let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
               ships[id].targetDestination = newMiningDestination;
               let avoid = false;

@@ -17,12 +17,51 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
   let newHalitePotential = -haliteMoveCost;
   let currentHalitePotential = halitePotential(gameMap, ship.position, kTurns);
   let id = ship.id;
-  let possibleDestinations = search.circle(gameMap, ship.position, 3);
+  let possibleDestinations = search.circle(gameMap, ship.position, range);
+  /*
   let possibleDestinations1 = possibleDestinations.slice(1, 5);
   let possibleDestinations2 = possibleDestinations.slice(5, 13);
   let possibleDestinations3 = possibleDestinations.slice(13, 29);
+  */
   let bestNewHaliteDestination = ship.position;
+  for (let i = 0; i < possibleDestinations.length; i++) {
+    let newTile = gameMap.get(possibleDestinations[i]);
+    let turnOffset = 2;
+    if (i <= 4){
+      turnOffset = 2;
+    }
+    else if (i <= 12) {
+      turnOffset = 4;
+    }
+    else if (i <= 28) {
+      turnOffset = 6;
+    }
+    else if (i <= 60) {
+      turnOffset = 8;
+    }
+    else if (i <= 124) {
+      turnOffset = 10;
+    }
+    else {
+      turnOffset = 10;
+    }
+    if (!newTile.isOccupied && !newTile.hasStructure){
+      //unoccupiedPositions.push(possibleDestinations[i]);
+
+      let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations[i], kTurns - turnOffset);
+      let thisHaliteStart = newTile.haliteAmount;
+      let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent;
+
+      //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
+
+      if (thisHalitePotential > newHalitePotential) {
+        newHalitePotential = thisHalitePotential;
+        bestNewHaliteDestination = possibleDestinations[i];
+      }
+    }
+  }
   
+  /*
   if (range >= 1){
     for (let i = 0; i < possibleDestinations1.length; i++) {
       let newTile = gameMap.get(possibleDestinations1[i]);
@@ -82,6 +121,7 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
       }
     }
   }
+  */
   //Keep mining original place if better
   if (newHalitePotential < currentHalitePotential) {
     omp = ship.position;
