@@ -59,11 +59,14 @@ if [ -n "$path3" ]; then
   players=4
 fi
 
-echo "Comparing Bots for ${games} games"
+averageGameTime=2000
 
+echo "Comparing Bots for ${games} games"
 echo 'data = [' > $DIR/output.json
 MapSize=('32' '40' '48' '56' '64')
+GameNumber=0
 for i in $( seq 1 $games ); do
+    GameNumber=$(( GameNumber + 1 ))
     : '
     if [$fixedMap -ne 1]; then
       ThisMapSize=${MapSize[$((RANDOM%=4))]}
@@ -71,13 +74,13 @@ for i in $( seq 1 $games ); do
       ThisMapSize=$fixedMapSize
     fi
     '
-    ThisMapSize=${MapSize[$((RANDOM%=4))]}
-    echo "Beginning game with map size $ThisMapSize and $players players"
+    ThisMapSize=${MapSize[$(( $GameNumber %5 ))]}
+    echo "Beginning game $GameNumber of $games with map size $ThisMapSize x $ThisMapSize and $players players"
     if [ $players -eq 2 ]; then
       ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" --results-as-json --no-logs >> $DIR/output.json
     fi
     if [ $players -eq 4 ]; then
-      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" "node ${path3}" "node ${path4}" --results-as-json --no-logs >> output.json
+      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" "node ${path3}" "node ${path4}" --results-as-json --no-logs >> $DIR/output.json
     fi
     echo ',' >> $DIR/output.json
 done

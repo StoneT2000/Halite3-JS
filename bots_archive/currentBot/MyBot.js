@@ -29,6 +29,15 @@ game.initialize().then(async () => {
   let maxDropoffs = 1;
   let averageHalite = 0;
   let idealDropOffLocs = [];
+  let attackMode = true; //allow semi-intentional collisions with opponent
+  
+  if (game.players.length === 4){
+    attackMode = false;
+    logging.info(`No Attacking`)
+  }
+  else {
+    logging.info(`Ships can attack`)
+  }
   for (let i = 0; i < gameMap.width; i++) {
     for (let j = 0; j < gameMap.width; j++) {
       averageHalite += gameMap.get(new Position(i,j)).haliteAmount;
@@ -256,7 +265,9 @@ game.initialize().then(async () => {
                 let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
                 ships[id].targetDestination = nearestDropoff.position;
               }
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
+              
+              //Last two arguments of below are true, false = avoid and dont attack
+              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true, false);
               break;
               /*
             case 'search':
@@ -279,10 +290,10 @@ game.initialize().then(async () => {
               let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
               ships[id].targetDestination = newMiningDestination;
               let avoid = false;
-              if (ship.haliteAmount >= 800) {
+              if (ship.haliteAmount >= 100) {
                 avoid = true;
               }
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid);
+              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid, attackMode);
               break;
             case 'leaveAnywhere':
               //search for any open spot to leave and go there

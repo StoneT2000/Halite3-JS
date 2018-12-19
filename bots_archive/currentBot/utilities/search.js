@@ -76,8 +76,28 @@ function findNearestDropoff(gameMap, player, sourcePos) {
   }
   return nearestStructure;
 }
+function numShipsInRadius(gameMap, owner, position, radius) {
+  let positions = circle(gameMap, position, radius);
+  let totalShips = 0;
+  let friendly = 0;
+  let enemy = 0;
+  for (let i = 0; i < positions.length; i++) {
+    let tile = gameMap.get(positions[i]);
+    if (tile.ship !== null) {
+      if (tile.ship.owner === owner) {
+        friendly += 1;
+      }
+      else {
+        enemy += 1;
+      }
+    }
+  }
+  totalships = friendly + enemy;
+  return {total:totalships, friendly: friendly, enemy: enemy}
+}
 module.exports = {
   manhattanDeltas,
   circle,
   findNearestDropoff,
+  numShipsInRadius,
 };
