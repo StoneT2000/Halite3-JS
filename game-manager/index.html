@@ -1,0 +1,88 @@
+<script src="jquery-3.3.1.min.js"></script>
+<script src="output.json"></script>
+<script>
+  var wins = {};
+  var totalGames = data.length;
+  var winRatios = {};
+  var numPlayers = 0;
+  if(data.length > 0) {
+    for (key in data[0].stats){
+      numPlayers++;
+      wins[key] = 0;
+      winRatios[key] = 0;
+    }
+    console.log("There are " + numPlayers + " players")
+    for (let i = 0; i < data.length; i++) {
+      let gameData = data[i];
+      for (let key in gameData.stats) {
+        if (gameData.stats[key].rank === 1) {
+          wins[key] += 1;
+        }
+      }
+    }
+    for (key in data[0].stats){
+      winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
+    }
+  }
+  console.log(winRatios);
+  $(document).ready(function() {
+    document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
+    for (key in winRatios) {
+      $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td></tr>")
+    }
+  });
+</script>
+<style>
+  *{
+    font-family: 'Open Sans';
+    color: '#333333';
+    background-color: #fefefe;
+  }
+  .container {
+    max-width: 80%;
+    margin-left:10%;
+  }
+  #stats_for_nerds_table {
+  margin: auto;
+  border-spacing:0px;
+  border: 2px solid #343a40;
+  margin-top:1rem;
+  font-family: 'Open Sans', sans-serif;
+}
+
+#stats_for_nerds_table tr {
+  margin:0px;
+  padding:0px;
+}
+
+#stats_for_nerds_table th {
+  padding: 10px;
+  font-size: 25px;
+  color: white;
+  font-weight: 300;
+  background-color: #6c757d;
+  border-top: 2px solid #343a40;
+  border-right: 2px solid #343a40;
+  border-bottom: 2px solid #343a40;
+  border-left: 2px solid #343a40;
+
+}
+#stats_for_nerds_table td {
+  color:#343a40;
+  border-bottom: 2px solid #343a40;
+  padding: 6px;
+  font-size: 20px;
+  border-right: 2px solid #343a40;
+  border-left: 2px solid #343a40;
+}
+</style>
+<body>
+  <div class="container">
+    <h1 id="header">Results</h1>
+    <table id="stats_for_nerds_table">
+      <th>Bot #</th>
+      <th>Wins</th>
+      <th>Win Ratio</th>
+    </table>
+  </div>
+</body>
