@@ -191,7 +191,7 @@ function worthAttacking(gameMap, ship, oship) {
     possibleCollisonPos = ship.position.directionalOffset(collisionDirections[0]);
   }
 
-  if(1.2 * ship.haliteAmount < oship.haliteAmount) {
+  if(1.5 * ship.haliteAmount < oship.haliteAmount) {
     let shipsNearby = search.numShipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
     let friendlyNearby = shipsNearby.friendly;
     if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy){
