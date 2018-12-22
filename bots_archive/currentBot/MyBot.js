@@ -131,22 +131,14 @@ game.initialize().then(async () => {
     let tempId = -10;
     let localHaliteCount = me.haliteAmount;
     if ((game.turnNumber < 0.55 * hlt.constants.MAX_TURNS && numShips <= Math.sqrt(mapSize)) &&
-      me.haliteAmount >= hlt.constants.SHIP_COST && !gameMap.get(me.shipyard).isOccupied ) {
+      me.haliteAmount >= hlt.constants.SHIP_COST) {
       let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
-      let open = 5;
-      for (let i = 0; i < positionsToCheck.length; i++) {
-        if(gameMap.get(positionsToCheck[i]).isOccupied) {
-          open -=1;
-        }
-      }
       //logging.info(`Open spots: ${open}`);
-      if (open >= 2) {
         //>=2 because one spot is the spawn point, one is an exit point.
         commandQueue.push(me.shipyard.spawn());
         localHaliteCount -= 1000;
         shipDesiredPositions[tempId] = [me.shipyard.position];
         tempId -= 1;
-      }
     }
     numShips = 0;
     
