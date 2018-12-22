@@ -89,6 +89,7 @@ game.initialize().then(async () => {
   else if (mapSize > 1600) {
     maxDropoffs = 2;
   }
+  
   while (true) {
     let start = new Date().getTime();
     let shipCommands = {};
@@ -240,8 +241,8 @@ game.initialize().then(async () => {
           }
         }
       }
-      else {
-        ships[id].mode ='mine';
+      if (ships[id].mode === 'none') {
+        ships[id].mode = 'mine';
       }
       
       //Determine if ship needs a new target destination
@@ -268,11 +269,27 @@ game.initialize().then(async () => {
             case 'mine':
               let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
               ships[id].targetDestination = newMiningDestination;
-              let avoid = false;
-              if (ship.haliteAmount >= 100) {
-                avoid = true;
+              
+              let avoid = true;
+              let possibleEnemyPositions = search.circle(gameMap, ship.position, 2);
+              for (let i = 0; i < possibleEnemyPositions.length; i++) {
+                let possibleEnemyTile = gameMap.get(possibleEnemyPositions[i]);
+                let oship = possibleEnemyTile.ship;
+                
+                //IMPROVEMENT: Doesn't check for which ship is best to collide into if there are several ones worth attacking
+                if (oship !== null && oship.owner !== ship.owner) {
+                  if (movement.worthAttacking(gameMap, ship, oship)) {
+                    ships[id].targetDestination = oship.position;
+                    avoid = false;
+                    break;
+                  }
+                }
               }
+              
+              
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid);
+              
+              //add code for determining who to attack here
               break;
             case 'leaveAnywhere':
               //search for any open spot to leave and go there
@@ -308,7 +325,7 @@ game.initialize().then(async () => {
 
         shipDirections[id] = directions;
         shipDesiredPositions[id] = [];
-
+        //logging.info(`Ship-${ship.id} at ${ship.position} direction order: ${directions}`);
         //Store the desired positions
         for (let j = 0; j < directions.length; j++) {
           shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
@@ -362,11 +379,11 @@ game.initialize().then(async () => {
           
           //force a direction if no direction left or if there is no halite below and only direction so far is still
           if (shipDesiredPositions[id].length === 0) {
-            //logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
-            //shipDirections[id] = [Direction.Still];
-            //shipDesiredPositions[id] = [ship.position];
+            logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
+            shipDirections[id] = [Direction.Still];
+            shipDesiredPositions[id] = [ship.position];
           }
-          
+          /*
           if (shipDesiredPositions[id].length === 0 || (shipDesiredPositions[id].length === 1 && gameMap.get(ship.position).haliteAmount === 0 && shipDesiredPositions[id][0].equals(Direction.Still))) {
             directions = movement.moveAwayFromSelf(gameMap, ship);
             shipDirections[id] = directions;
@@ -375,6 +392,7 @@ game.initialize().then(async () => {
             }
             logging.info(`Ship-${id} PANIC: JUMPING ${shipDesiredPositions[id]}`);
           }
+          */
           
         }
 

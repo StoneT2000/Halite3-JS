@@ -16,13 +16,13 @@ function canMove(gameMap, ship) {
 //viableDirections always returns an array sorted by priority the directions should be in order to reach targetPos and avoid or don't avoid enemies. All directions are present in the array.
 //(0. ALWAYS avoid friendly collisions, this is satisfied by code in MyBot.js)
 //1. ALLOW enemy collisions if avoid === false. If avoid === true (as needed by return ships), avoid collision
-//2. PURPOSELY attack enemies if attack === true
 
 //How do we prioritize which directions to move?
 //1. Find directions that go towards the target position. Add the still direction next as its better than moving away the target position
 //2. Determine which of the directions are safe and put that in the array safeDirections
-//3.1. If avoid is true, prioritize all safeDirections in the order of which is closer to the target position.
+//3.1. If avoid is true, prioritize all absoluteSafeDirections in the order of which is closer to the target position.
 //3.2. If avoid is false, allow collisions to occur in attempt to reach the targetPos
+//4. If no absoluteSafeDirections available, prioritize safeDirections in order which they have less enemies directly near
 
 
 function viableDirections(gameMap, ship, targetPos, avoid) {
@@ -38,142 +38,113 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
     //doing nothing is always an option and an better option than moving in a direction not towards target position
     directions.push(new Direction(0, 0));
   }
-  let safeDirections = []; //all safe directions
-  let priorirtyTargetDirections = [];
+  let absoluteSafeDirections = []; //all absolute safe directions. It is absolutely safe if there isn't any enemy ship adjacent to the tile this ship reaches by taking that direction
+  let safeDirections = []; //all safe directions that don't have an enemy directly on the tile this ship might move to.
+  let attackDirections = []; //directions in which the ship can take to try and attack an enemy
   
-  let adjacentPositions = search.circle(gameMap, ship.position, 1); //adjacent Positions the ship can move to
+  let allDirections = [Direction.Still, Direction.North, Direction.South, Direction.East, Direction.West ] //all directions the ship can take
     
   
   //go through directions and check surrounding squares to avoid
-  //TODO: go through all cardinals and check which ones are safe
-
-  for (let i = 0; i < adjacentPositions.length; i++) {
-    let adjacentTile = gameMap.get(adjacentPositions[i]);
-    let oship = adjacentTile.ship;
-    if (oship !== null && oship.owner !== ship.owner) {
-      if (true) {
-        //If not a worth while attack
-        if(!worthAttacking(gameMap, ship, oship)){
-        }
-        else {
-          logging.info(`Ship-${ship.id} can chase/attack enemy at ${adjacentPositions[i]} as ${oship.haliteAmount} > 2*${ship.haliteAmount}`)
-          safePosition = false; //still not safe
-
-          //Find all moves that will allow ship to collide or move towards possible collision
-          //repetitive, these directions are calculated in worthAttackign function
-          let newTargetDirections = gameMap.getUnsafeMoves(ship.position, oship.position);
-          for (let k = 0; k < newTargetDirections.length; k++) {
-            priorirtyTargetDirections.push(newTargetDirections[k])
-          }
-          //prioritize this unsafe direction as we want the ship to collide
-        }
-      }
-    }
-  }
-
-    for (let i = 0; i < directions.length; i++){
-      let potentialPos = ship.position.directionalOffset(directions[i]);
-      //logging.info(`Ship-${ship.id} at ${ship.position} think about ${potentialPos}`);
-      let surroundingPositions = search.circle(gameMap, potentialPos, 1);
-      let safePosition = true;
-      for (let j = 0; j < surroundingPositions.length; j++) {
-        let tile = gameMap.get(surroundingPositions[j]);
-        let oship = tile.ship;
-        /*
-        if (oship !== null) {
-          logging.info(`Ship-${ship.id} at ${ship.position} saw ship at ${surroundingPositions[j]}`);
-        }
-        */
+  
+  //Goes through all directions and checks surrounding squares if there is an enemy on it to see which directions are absolutely safe and which are just safe only if we are trying to avoid enemies
+  
+  if (avoid === true){
+    for (let i = 0; i < allDirections.length; i++) {
+      //position in searched direction
+      let possiblePosition = ship.position.directionalOffset(allDirections[i]);
+      
+      //Find all adjacent positions to the position in the searched direction
+      let possiblePositionsNearby = search.circle(gameMap, possiblePosition, 1);
+      
+      let isThisAbsoluteSafe = true; //whether possiblePosition is absolutely safe
+      let isThisSafe = true; //whether possiblePosition is safe
+      let numEnemies = 0;
+      for (let j = 0; j < possiblePositionsNearby.length; j++) {
+        let possiblePositionNearbyTile = gameMap.get(possiblePositionsNearby[j]);
+        let oship = possiblePositionNearbyTile.ship;
         if (oship !== null && oship.owner !== ship.owner) {
-          if (true) {
-            //If not a worth while attack
-            if(!worthAttacking(gameMap, ship, oship)){
-              safePosition = false;
-            }
-            else {
-              logging.info(`Ship-${ship.id} can chase/attack enemy at ${surroundingPositions[j]} as ${oship.haliteAmount} > 2*${ship.haliteAmount}`)
-              safePosition = false; //still not safe
-              
-              //Find all moves that will allow ship to collide or move towards possible collision
-              //repetitive, these directions are calculated in worthAttackign function
-              let newTargetDirections = gameMap.getUnsafeMoves(ship.position, oship.position);
-              for (let k = 0; k < newTargetDirections.length; k++) {
-                priorirtyTargetDirections.push(newTargetDirections[k])
-              }
-              //prioritize this unsafe direction as we want the ship to collide
-            }
+          //if there is a ship on the adjacent tile and the owner of the ship isn't the same owner as this ship (enemy)
+          numEnemies += 1;
+          //Set this direction as not safe.
+          isThisAbsoluteSafe = false;
+          if (j === 0) {
+            //The way search.circle works is it performs a BFS search for the closest squares in radius 1 (although a little cheated as we use a sorted look up table). The first element of possiblePositions is then always the original square that was searched around.
+            isThisSafe = false;
           }
-          else {
-            safePosition = false;
-          }
-          //logging.info(`Ship-${ship.id} at ${ship.position} thought about ${potentialPos} but there's enemy`);
-          break;
         }
       }
-      if (safePosition) {
-        safeDirections.push(directions[i]);
+      if (isThisAbsoluteSafe === true) {
+        let distanceAway = gameMap.calculateDistance(possiblePosition,targetPos);
+        //logging.info(`Ship-${ship.id} at ${ship.position} has absolute safe direction: ${allDirections[i]} ${distanceAway} away`);
+        absoluteSafeDirections.push({dir:allDirections[i], dist:distanceAway, enemies: numEnemies});
+      }
+      if (isThisSafe === true) {
+        safeDirections.push({dir:allDirections[i], dist:gameMap.calculateDistance(possiblePosition,targetPos), enemies: numEnemies})
       }
     }
-    directions = [];
-    for (let k = 0; k < priorirtyTargetDirections.length; k++) {
-      directions.push(priorirtyTargetDirections[k]);
-    }
-    for (let k = 0; k < safeDirections.length; k++) {
-      directions.push(safeDirections[k]);
-    }
-
-    //logging.info(`Ship-${ship.id} at ${ship.position} has these safe ${directions}`);
-
-  
-  //if after all of this checking, there aren't any safe directions or prioritized directions put into the directions array
-  //Then PANIC and determine safety by 1 degree lower, find directions to tiles that aren't occupied by a different ship and are have the least number of ships adjacent. These are the more preferred directions
-  let unoccupiedDirections = []
-  if (directions.length === 0) {
-    
-    let nsp = search.numShipsInRadius(gameMap, ship.owner, ship.position, 1);
-    unoccupiedDirections.push({dir:Direction.Still, enemy:nsp.enemy});
-    //We can optimize this as we already searched around the ship position in the first block of code if one of the unsafe directions that goes to the target is direction.still
-    let possibleDirections = Direction.getAllCardinals();
-   
-    //let adjacentPositions = search.circle(gameMap, ship.position, 1);
-    for (let i = 0; i < possibleDirections.length; i++) {
-      let possiblePos = ship.position.directionalOffset(possibleDirections[i]);
-      let possibleTile = gameMap.get(possiblePos);
-      let nearbyShipsFound = search.numShipsInRadius(gameMap, ship.owner, possiblePos, 1);
-      if (possibleTile.ship === null){
-        unoccupiedDirections.push({dir:possibleDirections[i], enemy:nearbyShipsFound.enemy});
-      }
-    }
-    //sort unoccupied directions by least number of enemies
-    unoccupiedDirections.sort(function(a,b) {
-      return a.enemy-b.enemy;
+    //Sort absolute safe directions by which is closer to target position
+    let sortedAbsoluteSafeDirections = [];
+    absoluteSafeDirections.sort(function(a,b){
+      return a.dist - b.dist;
     });
-    logging.info(`Ship-${ship.id} best dirs: ${unoccupiedDirections[0].dir}`);
     
   }
-  for (let i = 0; i< unoccupiedDirections.length; i++) {
-    directions.push(unoccupiedDirections[i].dir)
-  }
-
   
-  //Add remaining directions
-  let allDir = Direction.getAllCardinals();
+  //If trying to avoid enemy ships but there are no absolutely safe directions, then choose safe directions with least enemies around and out of those, find the closest to target
+  if (avoid === true) {
+    if (absoluteSafeDirections.length === 0) {
+      if (safeDirections.length === 0) {
+        //if there are 0 safe directions
+        directions = [Direction.Still];
+      }
+      else {
+        //If there are some safe directions, look through them
+        let possibleSafeDirections = [];
+        let leastEnemyCount = 1000;
+        for (let j = 0; j < safeDirections.length; j++) {
+          if (safeDirections[j].enemies < leastEnemyCount) {
+            //reset that array as a direction with less enemies was found
+            possibleSafeDirections = [safeDirections[j]];
+          }
+          else if (safeDirections[j].enemies === leastEnemyCount) {
+            //Add safe direction that has the least enemies nearby
+            possibleSafeDirections.push(safeDirections[j]);
+          }
+        }
+        //sort the directions with the least enemies nearby by distance
+        possibleSafeDirections.sort(function(a,b){
+          return a.dist - b.dist;
+        })
+        directions = possibleSafeDirections.map(function(a){
+          return a.dir;
+        });
+      }
+    }
+    else {
+      directions = absoluteSafeDirections.map(function(a){
+        return a.dir;
+      });
+    }
+  }
+  //By now, directions will include the safest directions possible that also are the closest to the targetPos
+  //Add remaining directions to allow flexibility in movement in case of conflicts
   let diffDir = [];
-  for (let i = 0; i < allDir.length; i++) {
+  for (let i = 0; i < allDirections.length; i++) {
     let isItThere = false;
     for (let j = 0; j < directions.length; j++) {
-      if (allDir[i].equals(directions[j])){
+      if (allDirections[i].equals(directions[j])){
         isItThere = true;
       }
     }
     if (isItThere === false) {
-      diffDir.push(allDir[i]);
+      diffDir.push(allDirections[i]);
     }
   }
   for (let i = 0; i < diffDir.length; i++){
     directions.push(diffDir[i])
   }
-  //logging.info(`Ship-${ship.id} at ${ship.position} directionr order: ${directions}`);
+  //logging.info(`Ship-${ship.id} at ${ship.position} direction order: ${directions}`);
   return directions;
 }
 
@@ -237,7 +208,7 @@ function worthAttacking(gameMap, ship, oship) {
     let shipsNearby = search.numShipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
     let friendlyNearby = shipsNearby.friendly;
     if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy){
-      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly}, e:${shipsNearby.enemy}`)
+      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly}, e:${shipsNearby.enemy} at ${possibleCollisonPos}`)
       return true;
     }
   }
@@ -250,4 +221,5 @@ module.exports = {
   viableDirections,
   finalMove,
   moveAwayFromSelf,
+  worthAttacking
 }
