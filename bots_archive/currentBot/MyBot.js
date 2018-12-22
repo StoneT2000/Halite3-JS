@@ -43,14 +43,14 @@ game.initialize().then(async () => {
     logging.info(`Ships can attack`)
   }
   for (let i = 0; i < gameMap.width; i++) {
-    for (let j = 0; j < gameMap.width; j++) {
+    for (let j = 0; j < gameMap.height; j++) {
       averageHalite += gameMap.get(new Position(i,j)).haliteAmount;
     }
   }
   averageHalite = averageHalite / mapSize;
   logging.info(`Average Halite: ${averageHalite}`);
   for (let i = 0; i < gameMap.width; i++) {
-    for (let j = 0; j < gameMap.width; j++) {
+    for (let j = 0; j < gameMap.height; j++) {
       let thisAmount = gameMap.get(new Position(i,j)).haliteAmount;
       if (thisAmount > averageHalite * 2 || thisAmount > 600) {
         idealDropOffLocs.push(new Position(i,j));
@@ -133,23 +133,22 @@ game.initialize().then(async () => {
     if ((game.turnNumber < 0.55 * hlt.constants.MAX_TURNS && numShips <= Math.sqrt(mapSize)) &&
       me.haliteAmount >= hlt.constants.SHIP_COST) {
       let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
-      //logging.info(`Open spots: ${open}`);
-        //>=2 because one spot is the spawn point, one is an exit point.
-        commandQueue.push(me.shipyard.spawn());
-        localHaliteCount -= 1000;
-        shipDesiredPositions[tempId] = [me.shipyard.position];
-        tempId -= 1;
+      commandQueue.push(me.shipyard.spawn());
+      localHaliteCount -= 1000;
+      shipDesiredPositions[tempId] = [me.shipyard.position];
+      tempId -= 1;
     }
     numShips = 0;
     
-    let shipsThatCantMove = [];
-    let shipsThatAreReturning = [];
-    let otherShips = [];
-    let prioritizedShips = [];
+    let shipsThatCantMove = []; //array of ships that don't have enough halite to move
+    let shipsThatAreReturning = []; //array of ships that are on return mode
+    let otherShips = []; //all other ships
+    let prioritizedShips = []; //the prioritized array of ships in which movements and decisions should be made
+    
     //Some unit preprocession stuff
     for (const ship of me.getShips()){
       let id = ship.id;
-      
+      numShips += 1;
       //make sure variables are defined
       if (ships[id] === undefined) {
         ships[id] = {};
@@ -162,6 +161,7 @@ game.initialize().then(async () => {
         ships[id].mode = 'mine';
         ships[id].targetDropoffId = -1;
       }
+      
       //First set the desired positions of units who can't move cuz they have no halite or something
       if (!movement.canMove(gameMap, ship)) {
         //If unit is cant move
@@ -179,6 +179,8 @@ game.initialize().then(async () => {
         otherShips.push(ship);
       }
     }
+    
+    //Build the prioritized ships array
     for (let i = 0; i < shipsThatCantMove.length; i++) {
       prioritizedShips.push(shipsThatCantMove[i]);
     }
@@ -189,25 +191,24 @@ game.initialize().then(async () => {
       prioritizedShips.push(otherShips[i]);
     }
       
-    //Decide on movement
-    //Should be decided in order of priority
+    //Decide on movement and strategy in order of the priorities
     for (const ship of prioritizedShips) {
-      numShips += 1;
-      let id = ship.id;
-
       
+      let id = ship.id;
+      
+      //If ship was given a target destination and it has reached it, set its mode to none to force the ship to rethink its current strategy.
       if (ships[id].targetDestination !== null) {
         if (ships[id].targetDestination.equals(ship.position)) {
           ships[id].mode = 'none';
           ships[id].targetDestination = null;
-          //logging.info(`Ship-${id} reached dest: has no mode`);
         }
       }
       
       let oldMode = ships[id].mode;
+      
       //DETERMINE SHIP MODE:
       
-      //Returning mode if there is enough halite store.
+      //Returning mode if there is enough halite in cargo or ship was already trying to return.
       if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || ships[id].mode === 'return') {
         ships[id].mode = 'return';
       }
@@ -221,6 +222,7 @@ game.initialize().then(async () => {
       }
       else if (numDropoffs < maxDropoffs && localHaliteCount >= hlt.constants.DROPOFF_COST && game.turnNumber <= 0.85 * hlt.constants.MAX_TURNS) {
         //code needs lot of betterment
+        //Building dropoffs code
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
         let dist = gameMap.calculateDistance(ship.position, nearestDropoff.position);
         let distShipyard = gameMap.calculateDistance(ship.position, me.shipyard.position);
@@ -236,9 +238,6 @@ game.initialize().then(async () => {
 
             }
           }
-          
-          //ships[id].mode = 'buildDropoff';
-          
         }
       }
       else {
@@ -261,39 +260,19 @@ game.initialize().then(async () => {
           switch(ships[id].mode) {
             case 'return':
               //not optimized
-              //if (needsNewTarget){
-                let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
-                ships[id].targetDestination = nearestDropoff.position;
-              //}
-              
+              let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
+              ships[id].targetDestination = nearestDropoff.position;
               //Last two arguments of below are true, false = avoid and dont attack
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true, false);
+              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
               break;
-              /*
-            case 'search':
-              if (needsNewTarget){
-                let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
-                ships[id].targetDestination = newMiningDestination;
-              }
-              directions = movement.viableDirections(gameMap, ship, newMiningDestination);
-              break;
-              */
             case 'mine':
-              //Every turn its trying to mine, check for most optimal mining position
-              /*
-              let hl = mining.totalHaliteInRadius(gameMap, ship.position, 1);
-              if (hl < 100) {
-                shipMineRange = 5;
-                shipNumFutureTurnsToCalc = 12;
-              }
-              */
               let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
               ships[id].targetDestination = newMiningDestination;
               let avoid = false;
               if (ship.haliteAmount >= 100) {
                 avoid = true;
               }
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid, attackMode);
+              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid);
               break;
             case 'leaveAnywhere':
               //search for any open spot to leave and go there
@@ -337,17 +316,23 @@ game.initialize().then(async () => {
 
         //logging.info(`Desired Positions: ${shipDesiredPositions}`);
         //WE ALSO ASSUME THAT THERES ALWAYS A DIRECTION THAT WONT RESULT IN COLLISION
-        let k = 0;
+        
         let allowConflicts = false;
         if (meta === 'final') {
           let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
           let dist = gameMap.calculateDistance(ship.position, nearestDropoff.position);
           if (dist <= 1) {
-            //allow conflicts
+            //allow conflicts/collisions
             allowConflicts = true;
           }
         }
+        //If the ship has desired positions and we don't allow it to collide with any other ship...
         if (shipDesiredPositions[id].length >= 1 && allowConflicts === false){
+          
+          //Run through each of the ships desired positions until we find one of which there doesn't exist a conflict. Stop the loop if we find a viable position.
+          let k = 0;
+          let nonConflictDesiredPositions = [];
+          let nonConflictDirections = [];
           for (k = 0; k < shipDesiredPositions[id].length; k++) {
             let checkPos = shipDesiredPositions[id][k];
             //logging.info(`Checking Desired Position: ${checkPos}`);
@@ -355,22 +340,33 @@ game.initialize().then(async () => {
             for (otherId in shipDesiredPositions) {
               if (otherId != id) {
                 if (shipDesiredPositions[otherId][0].equals(checkPos)){
-                  //There is a conflict, stop and go to next desired position
-                  //If there is a conflict, and this ship with id=id has only one desired position (possibly due to being unable to move anywhere else because not enough halite), then resolve otherId
-                  //logging.info(`Ship-ID: ${id} conflict with ${otherId} at ${shipDesiredPositions[otherId][0]} `);
+                  //If there are two ships trying to go to the same place, we assume that the previous ships first desired position (which has already been checked for conflicts) is their desired and priortized one. So this ship will change its direction and desired position
                   existConflict = true;
                   break;
                 }
               }
             }
             if (existConflict === false) {
-              break;
+              //All directions and positions without conflict get pushed here.
+              nonConflictDirections.push(shipDirections[id][k]);
+              nonConflictDesiredPositions.push(shipDesiredPositions[id][k]);
             }
           }
-          shipDesiredPositions[id] = shipDesiredPositions[id].slice(k , shipDesiredPositions[id].length);
-          shipDirections[id] = shipDirections[id].slice(k, shipDirections[id].length);
+          //Set all possible non conflicting directions and positions
+          shipDesiredPositions[id] = nonConflictDesiredPositions
+          shipDirections[id] = nonConflictDirections
 
+          //If after checking for conflicts, there are no desired positions we can't do anything as the function movement.viableDirections returns all cardinal directions
+          
+          
+          
           //force a direction if no direction left or if there is no halite below and only direction so far is still
+          if (shipDesiredPositions[id].length === 0) {
+            //logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
+            //shipDirections[id] = [Direction.Still];
+            //shipDesiredPositions[id] = [ship.position];
+          }
+          
           if (shipDesiredPositions[id].length === 0 || (shipDesiredPositions[id].length === 1 && gameMap.get(ship.position).haliteAmount === 0 && shipDesiredPositions[id][0].equals(Direction.Still))) {
             directions = movement.moveAwayFromSelf(gameMap, ship);
             shipDirections[id] = directions;
@@ -379,6 +375,7 @@ game.initialize().then(async () => {
             }
             logging.info(`Ship-${id} PANIC: JUMPING ${shipDesiredPositions[id]}`);
           }
+          
         }
 
         /*

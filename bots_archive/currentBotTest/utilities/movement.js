@@ -3,7 +3,7 @@ const { Direction, Position } = require('./../hlt/positionals');
 const search = require('./search.js')
 const logging = require('./../hlt/logging');
 function canMove(gameMap, ship) {
-  if (ship.haliteAmount >= gameMap.get(ship.position).haliteAmount * 0.1) {
+  if (ship.haliteAmount >= Math.floor(gameMap.get(ship.position).haliteAmount * 0.1)) {
     return true;
   }
   return false;
@@ -12,23 +12,65 @@ function canMove(gameMap, ship) {
 //Returns all directions towards target, with a preference order. First element is most preferred
 //Disregards whether or not path is blocked by own ship
 //If attack is true the ship is allowed to collide with opponent
-function viableDirections(gameMap, ship, targetPos, avoid, attack) {
+
+//viableDirections always returns an array sorted by priority the directions should be in order to reach targetPos and avoid or don't avoid enemies. All directions are present in the array.
+//(0. ALWAYS avoid friendly collisions, this is satisfied by code in MyBot.js)
+//1. ALLOW enemy collisions if avoid === false. If avoid === true (as needed by return ships), avoid collision
+//2. PURPOSELY attack enemies if attack === true
+
+//How do we prioritize which directions to move?
+//1. Find directions that go towards the target position. Add the still direction next as its better than moving away the target position
+//2. Determine which of the directions are safe and put that in the array safeDirections
+//3.1. If avoid is true, prioritize all safeDirections in the order of which is closer to the target position.
+//3.2. If avoid is false, allow collisions to occur in attempt to reach the targetPos
+
+
+function viableDirections(gameMap, ship, targetPos, avoid) {
+  
+  //Gets directions that move towards the target position
   let directions = gameMap.getUnsafeMoves(ship.position, targetPos);
   
-  //checks whether to avoid collisons or not
-  
   if (directions.length === 0){
+    //If there are no directions to the targetPosition, set still as a direction
     directions = [new Direction(0, 0)];
   }
   else {
+    //doing nothing is always an option and an better option than moving in a direction not towards target position
     directions.push(new Direction(0, 0));
   }
-  //go through directions and check surrounding squares to avoid
-  //TODO: go through all cardinals and check which ones are safe
-  let safeDirections = [];
+  let safeDirections = []; //all safe directions
   let priorirtyTargetDirections = [];
   
-  if (avoid){
+  let adjacentPositions = search.circle(gameMap, ship.position, 1); //adjacent Positions the ship can move to
+    
+  
+  //go through directions and check surrounding squares to avoid
+  //TODO: go through all cardinals and check which ones are safe
+
+  for (let i = 0; i < adjacentPositions.length; i++) {
+    let adjacentTile = gameMap.get(adjacentPositions[i]);
+    let oship = adjacentTile.ship;
+    if (oship !== null && oship.owner !== ship.owner) {
+      if (true) {
+        //If not a worth while attack
+        if(!worthAttacking(gameMap, ship, oship)){
+        }
+        else {
+          logging.info(`Ship-${ship.id} can chase/attack enemy at ${adjacentPositions[i]} as ${oship.haliteAmount} > 2*${ship.haliteAmount}`)
+          safePosition = false; //still not safe
+
+          //Find all moves that will allow ship to collide or move towards possible collision
+          //repetitive, these directions are calculated in worthAttackign function
+          let newTargetDirections = gameMap.getUnsafeMoves(ship.position, oship.position);
+          for (let k = 0; k < newTargetDirections.length; k++) {
+            priorirtyTargetDirections.push(newTargetDirections[k])
+          }
+          //prioritize this unsafe direction as we want the ship to collide
+        }
+      }
+    }
+  }
+
     for (let i = 0; i < directions.length; i++){
       let potentialPos = ship.position.directionalOffset(directions[i]);
       //logging.info(`Ship-${ship.id} at ${ship.position} think about ${potentialPos}`);
@@ -43,7 +85,7 @@ function viableDirections(gameMap, ship, targetPos, avoid, attack) {
         }
         */
         if (oship !== null && oship.owner !== ship.owner) {
-          if (attack) {
+          if (true) {
             //If not a worth while attack
             if(!worthAttacking(gameMap, ship, oship)){
               safePosition = false;
@@ -81,7 +123,7 @@ function viableDirections(gameMap, ship, targetPos, avoid, attack) {
     }
 
     //logging.info(`Ship-${ship.id} at ${ship.position} has these safe ${directions}`);
-  }
+
   
   //if after all of this checking, there aren't any safe directions or prioritized directions put into the directions array
   //Then PANIC and determine safety by 1 degree lower, find directions to tiles that aren't occupied by a different ship and are have the least number of ships adjacent. These are the more preferred directions
