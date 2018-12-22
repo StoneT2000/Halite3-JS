@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('Current Bot: SM-Bot3 Dec-18');
+  await game.ready('Current Test: SM-Bot3 Dec-18');
 
   logging.info(`My Player ID is ${game.myId}.`);
   
