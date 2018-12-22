@@ -142,6 +142,10 @@ game.initialize().then(async () => {
     }
     numShips = 0;
     
+    let shipsThatCantMove = [];
+    let shipsThatAreReturning = [];
+    let otherShips = [];
+    let prioritizedShips = [];
     //Some unit preprocession stuff
     for (const ship of me.getShips()){
       let id = ship.id;
@@ -158,39 +162,39 @@ game.initialize().then(async () => {
         ships[id].mode = 'mine';
         ships[id].targetDropoffId = -1;
       }
-      
-      
       //First set the desired positions of units who can't move cuz they have no halite or something
-      if (movement.canMove(gameMap, ship)) {
-        //If unit is currently returning, 
-      }
-      else {
+      if (!movement.canMove(gameMap, ship)) {
+        //If unit is cant move
+        shipsThatCantMove.push(ship);
+        
         let directions = [Direction.Still];
         shipDirections[id] = directions;
         shipDesiredPositions[id] = [];
-        for (let j = 0; j < directions.length; j++) {
-          shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
-        }
-
+        shipDesiredPositions[id].push(ship.position);
       }
-    }
-    let prioritizedShips = [];
-    for (const ship of me.getShips()){
-      let id = ship.id
-      if (ships[id].mode === 'return') {
-        prioritizedShips.unshift(ship);
+      else if (ships[id].mode === 'return') {
+        shipsThatAreReturning.push(ship);
       }
       else {
-        prioritizedShips.push(ship);
+        otherShips.push(ship);
       }
     }
+    for (let i = 0; i < shipsThatCantMove.length; i++) {
+      prioritizedShips.push(shipsThatCantMove[i]);
+    }
+    for (let i = 0; i < shipsThatAreReturning.length; i++) {
+      prioritizedShips.push(shipsThatAreReturning[i]);
+    }
+    for (let i = 0; i < otherShips.length; i++) {
+      prioritizedShips.push(otherShips[i]);
+    }
+      
     //Decide on movement
     //Should be decided in order of priority
     for (const ship of prioritizedShips) {
       numShips += 1;
       let id = ship.id;
 
-      
       
       if (ships[id].targetDestination !== null) {
         if (ships[id].targetDestination.equals(ship.position)) {
@@ -215,7 +219,7 @@ game.initialize().then(async () => {
       else if (gameMap.get(ship.position).hasStructure) {
         ships[id].mode = 'leaveAnywhere'; //force unit to leave to allow others in
       }
-      else if (numDropoffs < maxDropoffs && localHaliteCount >= hlt.constants.DROPOFF_COST) {
+      else if (numDropoffs < maxDropoffs && localHaliteCount >= hlt.constants.DROPOFF_COST && game.turnNumber <= 0.85 * hlt.constants.MAX_TURNS) {
         //code needs lot of betterment
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
         let dist = gameMap.calculateDistance(ship.position, nearestDropoff.position);
@@ -257,10 +261,10 @@ game.initialize().then(async () => {
           switch(ships[id].mode) {
             case 'return':
               //not optimized
-              if (needsNewTarget){
+              //if (needsNewTarget){
                 let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
                 ships[id].targetDestination = nearestDropoff.position;
-              }
+              //}
               
               //Last two arguments of below are true, false = avoid and dont attack
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true, false);
