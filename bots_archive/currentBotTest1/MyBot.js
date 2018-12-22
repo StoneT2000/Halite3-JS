@@ -213,9 +213,7 @@ game.initialize().then(async () => {
       if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || ships[id].mode === 'return') {
         ships[id].mode = 'return';
       }
-      else if (ships[id].mode === 'final') {
-        ships[id].mode === 'final'; //This locks the final mode in place
-      }
+      
       else if (gameMap.get(ship.position).haliteAmount < hlt.constants.MAX_HALITE / 10){
         ships[id].mode = 'mine';
       }
@@ -258,7 +256,7 @@ game.initialize().then(async () => {
       
       let shipCanMove = movement.canMove(gameMap, ship);
       //If ship can't move, it will stay still and gather halite
-      if (true){
+      if (meta === 'normal'){
         if (shipCanMove) {
           switch(ships[id].mode) {
             case 'return':
@@ -303,25 +301,13 @@ game.initialize().then(async () => {
           }
         }
       }
-      /*
       else if (meta === 'final') {
         //not optimized;
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
         directions = movement.finalMove(gameMap, ship, nearestDropoff);
       }
-      */
-      //If nearing end of game, prepare to perform calculations for final return to dropoff
-      if (meta === 'final') {
-        let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
-        let turnsLeft = hlt.constants.MAX_TURNS - game.turnNumber;
-        turnsLeft -= 1; //one turn padding, might want to increase this due to possible collisions and inefficiency;
-        let distToDropoff = gameMap.calculateDistance(ship.position, nearestDropoff.position);
-        if (distToDropoff >= turnsLeft) {
-          ships[id].mode = 'final';
-          ships[id].targetDestination = nearestDropoff.position;
-          directions = movement.finalMove(gameMap, ship, nearestDropoff);
-        }
-      }
+      
+      
       
       if (ships[id].mode === 'buildDropoff') {
         commandQueue.push(ship.makeDropoff());
@@ -388,15 +374,35 @@ game.initialize().then(async () => {
           shipDirections[id] = nonConflictDirections
 
           //If after checking for conflicts, there are no desired positions we can't do anything as the function movement.viableDirections returns all cardinal directions
-
+          
+          
+          
           //force a direction if no direction left or if there is no halite below and only direction so far is still
           if (shipDesiredPositions[id].length === 0) {
             logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
             shipDirections[id] = [Direction.Still];
             shipDesiredPositions[id] = [ship.position];
           }
+          /*
+          if (shipDesiredPositions[id].length === 0 || (shipDesiredPositions[id].length === 1 && gameMap.get(ship.position).haliteAmount === 0 && shipDesiredPositions[id][0].equals(Direction.Still))) {
+            directions = movement.moveAwayFromSelf(gameMap, ship);
+            shipDirections[id] = directions;
+            for (let j = 0; j < directions.length; j++) {
+              shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
+            }
+            logging.info(`Ship-${id} PANIC: JUMPING ${shipDesiredPositions[id]}`);
+          }
+          */
           
         }
+
+        /*
+        for (let j = 0; j < directions.length; j++) {
+          shipDesiredPositions[id].push(ship.position.directionalOffset(directions[j]));
+        }
+        */
+        //logging.info(`Ship-${id} Desired Positions: ${shipDesiredPositions[id]}`);
+
       }
     }
     

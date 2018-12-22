@@ -185,7 +185,8 @@ function moveAwayFromSelf(gameMap, ship) {
 //Go to favorite one
 //WE will process these later
 function finalMove(gameMap, ship, dropoff) {
-  let directions = viableDirections(gameMap, ship, dropoff.position, true);
+  let directions = viableDirections(gameMap, ship, dropoff.position);
+  for (let i = 0; i < directions.length; i++) {}
   return directions;
 }
 
