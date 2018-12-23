@@ -4,6 +4,7 @@
   var wins = {};
   var totalGames = data.length;
   var winRatios = {};
+  var points = {}; //4 pts for 1st, 2 for 2nd, 1 for 3rd, 0 for last
   var gameResults = [];
   var numPlayers = 0;
   if(data.length > 0) {
@@ -11,6 +12,7 @@
       numPlayers++;
       wins[key] = 0;
       winRatios[key] = 0;
+      points[key] = 0;
     }
     console.log("There are " + numPlayers + " players")
     for (let i = 0; i < data.length; i++) {
@@ -22,6 +24,16 @@
         let rank = gameData.stats[key].rank;
         if (gameData.stats[key].rank === 1) {
           wins[key] += 1;
+          points[key] += 4;
+        }
+        else if (gameData.stats[key].rank === 2) {
+          points[key] += 2;
+        }
+        else if (gameData.stats[key].rank === 3) {
+          points[key] += 1;
+        }
+        else if (gameData.stats[key].rank === 4) {
+          points[key] += 0;
         }
         botWinners[rank-1] = key;
         gameScores[rank-1] = gameData.stats[key].score;
@@ -41,7 +53,7 @@
   $(document).ready(function() {
     document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
     for (key in winRatios) {
-      $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td></tr>")
+      $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td><td>" + points[key] + "</td></tr>")
     }
     for (let i = 0; i < gameResults.length; i++) {
       let formattedRanks = "";
@@ -117,6 +129,7 @@ td {
       <th>Bot #</th>
       <th>Wins</th>
       <th>Win Ratio</th>
+      <th>Points</th>
     </table>
     <table id="games_table">
       <th>Game #</th>
