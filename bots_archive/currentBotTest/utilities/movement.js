@@ -43,7 +43,6 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
   let attackDirections = []; //directions in which the ship can take to try and attack an enemy
   
   let allDirections = [Direction.Still, Direction.North, Direction.South, Direction.East, Direction.West ] //all directions the ship can take
-    
   
   //go through directions and check surrounding squares to avoid
   
@@ -88,6 +87,16 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
     absoluteSafeDirections.sort(function(a,b){
       return a.dist - b.dist;
     });
+    if (absoluteSafeDirections.length >= 2){
+      if (absoluteSafeDirections[0].dist === absoluteSafeDirections[1].dist) {
+        if (ship.id % 2 === 1) {
+          let tempASD = absoluteSafeDirections[0];
+          absoluteSafeDirections[0] = absoluteSafeDirections[1];
+          absoluteSafeDirections[1] = tempASD;
+          //logging.info(`Ship-${ship.id} switched directions from ${tempASD.dir} to ${absoluteSafeDirections[0].dir}`);
+        }
+      }
+    }
     
   }
   
@@ -184,8 +193,8 @@ function moveAwayFromSelf(gameMap, ship) {
 //Take a look at viable directions
 //Go to favorite one
 //WE will process these later
-function finalMove(gameMap, ship, dropoff) {
-  let directions = viableDirections(gameMap, ship, dropoff.position, true);
+function finalMove(gameMap, ship, dropoff, collide) {
+  let directions = viableDirections(gameMap, ship, dropoff.position, collide);
   return directions;
 }
 
