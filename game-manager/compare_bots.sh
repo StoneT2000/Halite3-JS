@@ -62,7 +62,7 @@ fi
 averageGameTime=2000
 
 echo "Comparing Bots for ${games} games"
-echo 'data = [' > $DIR/output.json
+echo 'data = [' > $DIR/tempoutput.json
 MapSize=('32' '40' '48' '56' '64')
 GameNumber=0
 for i in $( seq 1 $games ); do
@@ -77,11 +77,15 @@ for i in $( seq 1 $games ); do
     ThisMapSize=${MapSize[$(( $GameNumber %5 ))]}
     echo "Beginning game $GameNumber of $games with map size $ThisMapSize x $ThisMapSize and $players players"
     if [ $players -eq 2 ]; then
-      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" --results-as-json --no-logs >> $DIR/output.json
+      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" --results-as-json --no-logs >> $DIR/tempoutput.json
     fi
     if [ $players -eq 4 ]; then
-      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" "node ${path3}" "node ${path4}" --results-as-json --no-logs >> $DIR/output.json
+      ./halite --replay-directory replays/ --width $ThisMapSize --height $ThisMapSize "node ${path1}" "node ${path2}" "node ${path3}" "node ${path4}" --results-as-json --no-logs >> $DIR/tempoutput.json
     fi
-    echo ',' >> $DIR/output.json
+    echo ',' >> $DIR/tempoutput.json
+    cat $DIR/tempoutput.json > $DIR/output.json
+    echo ']' >> $DIR/output.json
 done
-echo ']' >> $DIR/output.json
+echo ']' >> $DIR/tempoutput.json
+cat $DIR/tempoutput.json > $DIR/output.json
+rm $DIR/tempoutput.json
