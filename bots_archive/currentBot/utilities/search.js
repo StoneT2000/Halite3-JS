@@ -58,7 +58,7 @@ function circle(gameMap, source, radius) {
   }
   return positions;
 }
-function findNearestDropoff(gameMap, player, sourcePos) {
+function findNearestDropoff(gameMap, player, sourcePos, distance) {
   
   let nearestStructure = player.shipyard;
   let dist = gameMap.calculateDistance(sourcePos, player.shipyard.position);
@@ -73,6 +73,9 @@ function findNearestDropoff(gameMap, player, sourcePos) {
       dist = newdist;
       nearestStructure = dropoff;
     }
+  }
+  if (distance) {
+    return {nearest: nearestStructure, distance: dist};
   }
   return nearestStructure;
 }

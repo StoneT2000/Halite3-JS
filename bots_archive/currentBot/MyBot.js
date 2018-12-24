@@ -184,7 +184,7 @@ game.initialize().then(async () => {
         tempId -= 1; 
       }
     }
-    if (localHaliteCount >= hlt.constants.DROPOFF_COST) {
+    if (localHaliteCount >= hlt.constants.DROPOFF_COST - 500) {
       buildDropoffs = true;
     }
     
@@ -475,7 +475,7 @@ game.initialize().then(async () => {
         if (haliteAvailable >= hlt.constants.DROPOFF_COST){
           commandQueue.push(ship.makeDropoff());
           logging.info(`Building with ship-${id}`)
-          
+          localHaliteCount -= (hlt.constants.DROPOFF_COST - ship.haliteAmount - gameMap.get(ship.position).haliteAmount);
           //we dont' remove the newly built on position from designatedDropoffBuildPositions array because u can't build on another structure anyway.
           numDropoffs += 1;
           delete shipDirections[id];
