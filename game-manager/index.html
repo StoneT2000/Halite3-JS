@@ -1,4 +1,5 @@
 <script src="jquery-3.3.1.min.js"></script>
+<script src="FileSaver.js"></script>
 <script src="output.json"></script>
 <script>
   var wins = {};
@@ -77,6 +78,40 @@
       $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>" + formattedTerminated + "</td></tr>")
     }
   });
+  
+  //remove useless data:
+  let csvJSONdata = JSON.parse(JSON.stringify(data));
+  for (let it in csvJSONdata) {
+    delete csvJSONdata[it].final_snapshot;
+    delete csvJSONdata[it].error_logs;
+    delete csvJSONdata[it].execution_time;
+    delete csvJSONdata[it].map_generator
+    delete csvJSONdata[it].replay;
+    csvJSONdata[it].p0 = csvJSONdata[it].stats[0].rank.toFixed(2);
+    csvJSONdata[it].score0 = csvJSONdata[it].stats[0].score
+    csvJSONdata[it].p1 = csvJSONdata[it].stats[1].rank.toFixed(2);
+    csvJSONdata[it].score1 = csvJSONdata[it].stats[1].score;
+    csvJSONdata[it].scoreDiff = csvJSONdata[it].stats[0].score - csvJSONdata[it].stats[1].score;
+    //didnt do p4 yet
+    delete csvJSONdata[it].stats;
+    delete csvJSONdata[it].terminated;
+    delete csvJSONdata[it].map_seed;
+  } 
+  
+  const items = csvJSONdata
+  const replacer = (key, value) => value === null ? '' : value // specify how you want to handle null values here
+  const header = Object.keys(items[0])
+  let csv = items.map(row => header.map(fieldName => JSON.stringify(row[fieldName], replacer)).join(','))
+  csv.unshift(header.join(','))
+  csv = csv.join('\r\n')
+
+  console.log(csv)
+  
+  var csvblob = new Blob([csv], {
+    type: "text/plain;charset=utf-8"
+  });
+  //saveAs(csvblob, "data.csv");
+  
 </script>
 <style>
   *{
@@ -124,6 +159,7 @@ td {
 </style>
 <body>
   <div class="container">
+    <button onclick="saveAs(csvblob, 'data.csv');">Download CSV Data</button>
     <h1 id="header">Results</h1>
     <table id="stats_for_nerds_table">
       <th>Bot #</th>
