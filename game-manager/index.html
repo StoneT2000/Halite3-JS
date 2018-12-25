@@ -2,57 +2,75 @@
 <script src="FileSaver.js"></script>
 <script src="output.json"></script>
 <script>
-  var wins = {};
   var totalGames = data.length;
+  var wins = {};
+    
   var winRatios = {};
   var points = {}; //4 pts for 1st, 2 for 2nd, 1 for 3rd, 0 for last
   var gameResults = [];
   var numPlayers = 0;
-  if(data.length > 0) {
-    for (key in data[0].stats){
-      numPlayers++;
-      wins[key] = 0;
-      winRatios[key] = 0;
-      points[key] = 0;
-    }
-    console.log("There are " + numPlayers + " players")
-    for (let i = 0; i < data.length; i++) {
-      let gameData = data[i];
-      let botWinners = [];
-      let terminatedBots = [];
-      let gameScores = [];
-      for (let key in gameData.stats) {
-        let rank = gameData.stats[key].rank;
-        if (gameData.stats[key].rank === 1) {
-          wins[key] += 1;
-          points[key] += 4;
-        }
-        else if (gameData.stats[key].rank === 2) {
-          points[key] += 2;
-        }
-        else if (gameData.stats[key].rank === 3) {
-          points[key] += 1;
-        }
-        else if (gameData.stats[key].rank === 4) {
-          points[key] += 0;
-        }
-        botWinners[rank-1] = key;
-        gameScores[rank-1] = gameData.stats[key].score;
+  function processData(data){
+    totalGames = data.length;
+    wins = {};
+    winRatios = {};
+    points = {}; //4 pts for 1st, 2 for 2nd, 1 for 3rd, 0 for last
+    gameResults = [];
+    numPlayers = 0;
+    if(data.length > 0) {
+      for (key in data[0].stats){
+        numPlayers++;
+        wins[key] = 0;
+        winRatios[key] = 0;
+        points[key] = 0;
       }
-      for (let key in gameData.terminated){
-        if (gameData.terminated[key] === true){
-          terminatedBots.push(key);
+      //console.log("There are " + numPlayers + " players")
+      for (let i = 0; i < data.length; i++) {
+        let gameData = data[i];
+        let botWinners = [];
+        let terminatedBots = [];
+        let gameScores = [];
+        for (let key in gameData.stats) {
+          let rank = gameData.stats[key].rank;
+          if (gameData.stats[key].rank === 1) {
+            wins[key] += 1;
+            points[key] += 4;
+          }
+          else if (gameData.stats[key].rank === 2) {
+            points[key] += 2;
+          }
+          else if (gameData.stats[key].rank === 3) {
+            points[key] += 1;
+          }
+          else if (gameData.stats[key].rank === 4) {
+            points[key] += 0;
+          }
+          botWinners[rank-1] = key;
+          gameScores[rank-1] = gameData.stats[key].score;
         }
+        for (let key in gameData.terminated){
+          if (gameData.terminated[key] === true){
+            terminatedBots.push(key);
+          }
+        }
+
+        gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores, size:gameData.map_width});
       }
-      gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores});
+      for (key in data[0].stats){
+        winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
+      }
     }
-    for (key in data[0].stats){
-      winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
-    }
+    return [winRatios, gameResults]
   }
-  console.log(winRatios);
+  var finalData = processData(data);
   $(document).ready(function() {
+    
+    
+    outputTable(finalData[0], finalData[1])
+    
+  });
+  function outputTable(winRatios, gameResults) {
     document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
+    $("#tables").html('<table id="stats_for_nerds_table"><th>Bot #</th><th>Wins</th><th>Win Ratio</th><th>Points</th></table><table id="games_table"><th>Game #</th><th>Ranks</th><th>Scores</th><th>Map Size</th><th>Terminated Bots</th></table>');
     for (key in winRatios) {
       $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td><td>" + points[key] + "</td></tr>")
     }
@@ -75,10 +93,30 @@
       for (let j = 0; j < gameResults[i].terminated.length; j++) {
         formattedTerminated += gameResults[i].terminated[j];
       }
-      $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>" + formattedTerminated + "</td></tr>")
+      $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>" + gameResults[i].size + " x " + gameResults[i].size +"</td><td>" + formattedTerminated + "</td></tr>")
     }
-  });
-  
+  }
+  function filterData(data, kt) {
+    let filtered = data.filter(function(value){
+      for (key in kt) {
+        //console.log(value[key.toString()])
+        if (value[key.toString()] === kt[key.toString()]) {
+          return true;
+        }
+      }
+      return false;
+    })
+    return filtered;
+  }
+  function displayFilteredData(data, filter) {
+    let filtered = filterData(data, filter);
+    let finalResults = processData(filtered);
+    outputTable(finalResults[0], finalResults[1]);
+  }
+  function displayAllData(data){
+    let finalResults = processData(data);
+    outputTable(finalResults[0], finalResults[1]);
+  }
   //remove useless data:
   let csvJSONdata = JSON.parse(JSON.stringify(data));
   for (let it in csvJSONdata) {
@@ -92,6 +130,7 @@
     csvJSONdata[it].p1 = csvJSONdata[it].stats[1].rank.toFixed(2);
     csvJSONdata[it].score1 = csvJSONdata[it].stats[1].score;
     csvJSONdata[it].scoreDiff = csvJSONdata[it].stats[0].score - csvJSONdata[it].stats[1].score;
+    csvJSONdata[it].avgHalite = csvJSONdata[it].map_total_halite/(csvJSONdata[it].map_width * csvJSONdata[it].map_height);
     //didnt do p4 yet
     delete csvJSONdata[it].stats;
     delete csvJSONdata[it].terminated;
@@ -105,7 +144,7 @@
   csv.unshift(header.join(','))
   csv = csv.join('\r\n')
 
-  console.log(csv)
+  //console.log(csv)
   
   var csvblob = new Blob([csv], {
     type: "text/plain;charset=utf-8"
@@ -161,6 +200,13 @@ td {
   <div class="container">
     <button onclick="saveAs(csvblob, 'data.csv');">Download CSV Data</button>
     <h1 id="header">Results</h1>
+    <button onclick="displayFilteredData(data,{map_width:32})">Display 32x32 games only</button>
+    <button onclick="displayFilteredData(data,{map_width:40})">Display 40x40 games only</button>
+    <button onclick="displayFilteredData(data,{map_width:48})">Display 48x48 games only</button>
+    <button onclick="displayFilteredData(data,{map_width:56})">Display 56x56 games only</button>
+    <button onclick="displayFilteredData(data,{map_width:64})">Display 64x64 games only</button>
+    <button onclick="displayAllData(data)">Display all games </button>
+    <div id="tables">
     <table id="stats_for_nerds_table">
       <th>Bot #</th>
       <th>Wins</th>
@@ -171,7 +217,9 @@ td {
       <th>Game #</th>
       <th>Ranks</th>
       <th>Scores</th>
+      <th>Map Size</th>
       <th>Terminated Bots</th>
     </table>
+    </div>
   </div>
 </body>

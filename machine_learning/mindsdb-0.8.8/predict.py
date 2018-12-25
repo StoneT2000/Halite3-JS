@@ -9,9 +9,20 @@ from mindsdb import *
 # print('The predicted rank for bot1 is {p1} with {conf} confidence'.format(p1=result1.predicted_values[0]['p1'], conf=result1.predicted_values[0]['prediction_confidence']))
 mapSizes = [32, 40, 48, 56, 64];
 scoreDiffResults = [];
+avgHalites = [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200]
+scoreDiffResultsHalite = [];
 for i in range(len(mapSizes)):
   scoreDiffResult = MindsDB().predict(predict='scoreDiff', when={'map_width': mapSizes[i]}, model_name='halite3_bot_scoreDiff')
   scoreDiffResults.append(scoreDiffResult)
-
+  
+for i in range(len(avgHalites)):
+  scoreDiffResult = MindsDB().predict(predict='scoreDiff', when={'avgHalite': avgHalites[i]}, model_name='halite3_bot_scoreDiff')
+  scoreDiffResultsHalite.append(scoreDiffResult)
+  
 for i in range(len(scoreDiffResults)):
   print('The predicted score diff on map size {mapSize} for bot0 vs bot1 is {scoreDiff} with {conf} confidence'.format(scoreDiff=scoreDiffResults[i].predicted_values[0]['scoreDiff'], conf=scoreDiffResults[i].predicted_values[0]['prediction_confidence'], mapSize=mapSizes[i]))
+  
+
+
+for i in range(len(scoreDiffResultsHalite)):
+  print('The predicted score diff for map with on average {avgHalite} halite for bot0 vs bot1 is {scoreDiff} with {conf} confidence'.format(scoreDiff=scoreDiffResultsHalite[i].predicted_values[0]['scoreDiff'], conf=scoreDiffResultsHalite[i].predicted_values[0]['prediction_confidence'], avgHalite=avgHalites[i]))

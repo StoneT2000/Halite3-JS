@@ -11,3 +11,4 @@ __pycache__/
 *.iws
 *.json
 *.json
+*.csv
