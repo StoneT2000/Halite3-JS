@@ -15,6 +15,13 @@ function findNextMiningPosition(gameMap, player, ship, range) {
   let maxHaliteRate = -1000;
   let mineTurns = 0;
   let totalTurnsSpent = 0;
+  let leastTurnsSpent = 1000;
+  let leastMineTurns = 0; //not needed
+  let useForcedPosition = false;
+  let forcedPosition = ship.position;
+  
+  let maxPotential = -1000;
+  
   for (let i = 0; i < possiblePositions.length; i++) {
     
     //Possible position to check
@@ -32,80 +39,95 @@ function findNextMiningPosition(gameMap, player, ship, range) {
         let distanceToDropoff = nearestDropoffAndDist.distance; //Number of turns it takes to return back to dropoff
         let distanceToPos = gameMap.calculateDistance(ship.position, pos); //Number of turns it takes to reach new position
         let totalHaliteMoveCost = 0;
-        totalHaliteMoveCost += costToMoveThere(gameMap, ship, pos); //Add the cost of going from currentPos to possible Mining position
+        let costToMoveToNewPos = costToMoveThere(gameMap, ship, pos); //Add the cost of going from currentPos to possible Mining position
         let localMaxHaliteRate = -1000;
         let turnsSpent = distanceToPos + distanceToDropoff;
         let localTurnsSpent = 0;
 
         //Amount of halite ship has in cargo at pos
         let haliteCargoThere = ship.haliteAmount;
-        haliteCargoThere -= totalHaliteMoveCost; //ship loses halite trying to move there as defined by costToMoveThere
-        if (haliteCargoThere < 0) {
+        haliteCargoThere -= costToMoveToNewPos; //ship loses halite trying to move there as defined by costToMoveThere
+        if (haliteCargoThere <= 0) {
           haliteCargoThere = 0;
+          turnsSpent += 1;
         }
 
-        //max look ahead by 10 turns of mining? to find halite rates.
-        //We stop the for loop when the halite collected is past the return minimum requirement, which is hlt.constants.MAX_HALITE / 1.02 = 1000/1.02
+          //max look ahead by 10 turns of mining? to find halite rates.
+          //We stop the for loop when the halite collected is past the return minimum requirement, which is hlt.constants.MAX_HALITE / 1.02 = 1000/1.02
 
-        let forcedPosition = false;
-
-        //Only consider positions of which there is sufficient halite
-
-        for (let k = 1; k < 10; k++) {
-          //halite collected, without considering overflow
-          let haliteCollected = halitePotential(gameMap, pos, k);
-          let newHaliteInCargo = haliteCollected + haliteCargoThere;
-          //If halite cargo overflows, then true halite collected is different as not all halite can be kept
-          if (haliteCargoThere + haliteCollected >= 1000) {
-            haliteCollected = 1000 - haliteCargoThere;
-            newHaliteInCargo = 1000;
-          }
-
-          let haliteLeft = gameMap.get(pos).haliteAmount - haliteCollected;
-          let costToGoBack = costToMoveThere(gameMap, ship, nearestDropoff.position, haliteLeft);
-
-          totalHaliteMoveCostNow = costToGoBack + totalHaliteMoveCost;
-          netHaliteCollected = haliteCollected - totalHaliteMoveCostNow;
-
-          //we measure rate by how much cargo is in there, not by the addition made in k turns
-          haliteRate = (newHaliteInCargo - costToGoBack)/(turnsSpent + k);
           
-          //haliteRate = (netHaliteCollected)/(turnsSpent + k);
-          
-          //logging.info(`Ship-${ship.id}: collect: ${haliteCollected} net-collected: ${netHaliteCollected}, left: ${haliteLeft}, totalmovecost: ${totalHaliteMoveCostNow}, turns: ${(turnsSpent+k)}`);
-          if (haliteRate > maxHaliteRate) {
-            maxHaliteRate = haliteRate;
-            omp = pos;
-            mineTurns = k;
-            totalTurnsSpent = turnsSpent + k;
-          }
-          if (haliteRate > localMaxHaliteRate) {
-            localMaxHaliteRate = haliteRate;
-            localTurnsSpent = turnsSpent + k;
 
-          }
-          if (haliteCargoThere + haliteCollected >= 1000/1.02) {
-            //logging.info(`Ship-${ship.id}: Overfilled`)
+          //Only consider positions of which there is sufficient halite
 
-            //If it takes one turn to fill ship at its current position, then take that turn, always more optimal
-            if (k === 1 && i === 0) {
+          for (let k = 1; k < 8; k++) {
+            //halite collected, without considering overflow
+            let haliteCollected = halitePotential(gameMap, pos, k);
+            let newHaliteInCargo = haliteCollected + haliteCargoThere;
+            //If halite cargo overflows, then true halite collected is different as not all halite can be kept
+            if (haliteCargoThere + haliteCollected >= 1000) {
+              haliteCollected = 1000 - haliteCargoThere;
+              newHaliteInCargo = 1000;
+            }
+
+            let haliteLeft = gameMap.get(pos).haliteAmount - haliteCollected;
+            let costToGoBack = costToMoveThere(gameMap, ship, nearestDropoff.position, haliteLeft);
+            
+            //totalHaliteMoveCostNow = costToGoBack + costToMoveToNewPos;
+            //netHaliteCollected = haliteCollected - totalHaliteMoveCostNow;
+            
+            let netHalite = haliteCollected - costToGoBack - costToMoveToNewPos;
+            let haliteRate = (netHaliteCollected)/(turnsSpent + k);
+            if (netHalite > maxPotential) {
+              maxPotential = netHalite;
+              omp = pos;
+              mineTurns = k;
+              totalTurnsSpent = turnsSpent + k;
+            }
+            
+            
+            //we measure rate by how much cargo is in there, not by the addition made in k turns
+            
+            //rate is measured by how much is collected, subtracted by the cost it took to get there and move back
+            /*
+            haliteRate = (haliteCollected - costToGoBack - costToMoveToNewPos)/(turnsSpent + k);
+
+            //haliteRate = (netHaliteCollected)/(turnsSpent + k);
+
+            //logging.info(`Ship-${ship.id}: collect: ${haliteCollected} has halite there: ${haliteCargoThere}, left: ${haliteLeft}, Cost to go back: ${costToGoBack}, mines for ${k} turns; total turns: ${(turnsSpent+k)} at ${pos}, rate: ${haliteRate}`);
+            if (haliteRate > maxHaliteRate) {
               maxHaliteRate = haliteRate;
               omp = pos;
               mineTurns = k;
               totalTurnsSpent = turnsSpent + k;
-              forcedPosition = true;
             }
-            break;
-          }
-        }
-        if (forcedPosition === true) {
-          break;
-        }
-        //logging.info(`Ship-${ship.id}: Rate: ${localMaxHaliteRate} when mine at ${pos} taking up ${localTurnsSpent}`);
+            if (haliteRate > localMaxHaliteRate) {
+              localMaxHaliteRate = haliteRate;
+              localTurnsSpent = turnsSpent + k;
 
+            }
+            if (haliteCargoThere >= 500 && haliteCargoThere + haliteCollected >= 1000/1.02) {
+              //if ship can fill enough to return, we find best position by the one that results in the ship coming back earliest
+              //logging.info(`Ships-${ship.id}: Mine ${k} turns total turns: ${turnsSpent+k} at ${pos}`)
+              if (turnsSpent + k < leastTurnsSpent) {
+                forcedPosition = pos;
+                maxHaliteRate = haliteRate; //no longer necessarily a max
+                leastTurnsSpent = totalTurnsSpent;
+                useForcedPosition = true;
+                leastMineTurns = k;
+              }
+            }
+            */
+          }
+          //logging.info(`Ship-${ship.id}: Rate: ${localMaxHaliteRate} when mine at ${pos} taking up ${localTurnsSpent}`);
+        
       }
 
     }
+  }
+  
+  if (useForcedPosition === true) {
+    logging.info(`Ship-${ship.id}: Rate: ${maxHaliteRate} when mining at ${forcedPosition} for ${leastMineTurns} turns taking up the least ${leastTurnsSpent} turns to get back`);
+    return forcedPosition;
   }
   logging.info(`Ship-${ship.id}: Rate: ${maxHaliteRate} when mining at ${omp} for ${mineTurns} turns taking up ${totalTurnsSpent} turns to get back`);
   return omp;

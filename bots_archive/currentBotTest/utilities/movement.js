@@ -26,7 +26,6 @@ function canMove(gameMap, ship) {
 
 
 function viableDirections(gameMap, ship, targetPos, avoid) {
-  
   //Gets directions that move towards the target position
   let directions = gameMap.getUnsafeMoves(ship.position, targetPos);
   
@@ -35,8 +34,23 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
     directions = [new Direction(0, 0)];
   }
   else {
+    
+    //If there are 2 directions towards target, they have the same distance away, so swap them depending on which leads to less halite loss. This isn't redundant as this will be used by ships who aren't avoiding enemies
+    if (directions.length >= 2) {
+      let halite0 = gameMap.get(ship.position.directionalOffset(directions[0])).haliteAmount;
+      let halite1 = gameMap.get(ship.position.directionalOffset(directions[1])).haliteAmount;
+      if (halite0 > halite1) {
+        let tempDirection = directions[0];
+        directions[0] = directions[1];
+        directions[1] = tempDirection;
+      }
+      
+    }
+    
     //doing nothing is always an option and an better option than moving in a direction not towards target position
     directions.push(new Direction(0, 0));
+    
+   
   }
   let absoluteSafeDirections = []; //all absolute safe directions. It is absolutely safe if there isn't any enemy ship adjacent to the tile this ship reaches by taking that direction
   let safeDirections = []; //all safe directions that don't have an enemy directly on the tile this ship might move to.
@@ -88,8 +102,12 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
       return a.dist - b.dist;
     });
     if (absoluteSafeDirections.length >= 2){
+      //If two absolute safe directions get the same distance, choose one with less halite cost
+      //This is a very narrowsighted method to find cheaper path. Checks only one move
       if (absoluteSafeDirections[0].dist === absoluteSafeDirections[1].dist) {
-        if (ship.id % 2 === 1) {
+        let halite0 = gameMap.get(ship.position.directionalOffset(absoluteSafeDirections[0].dir)).haliteAmount;
+        let halite1 = gameMap.get(ship.position.directionalOffset(absoluteSafeDirections[1].dir)).haliteAmount;
+        if (halite0 > halite1) {
           let tempASD = absoluteSafeDirections[0];
           absoluteSafeDirections[0] = absoluteSafeDirections[1];
           absoluteSafeDirections[1] = tempASD;
