@@ -5,6 +5,7 @@ const commands = require('./hlt/commands');
 //const util = require('./utilities');
 const movement = require('./utilities/movement.js');
 const mining = require('./utilities/mining.js');
+const testMining = require('./utilities/testMining.js');
 const search = require('./utilities/search.js');
 const game = new hlt.Game();
 
@@ -124,6 +125,7 @@ game.initialize().then(async () => {
           let haliteInRadiusOfThisTile = mining.totalHaliteInRadius(gameMap, gameMapPosition, 6);
 
           if (haliteInRadiusOfThisTile >= minHaliteAroundDropoff) {
+            //9 = max distance at which we allow ships to run and build dropoff
             let shipsInRadius = search.numShipsInRadius(gameMap, me.shipyard.owner, gameMapPosition, 9);
             if (shipsInRadius.friendly >= 1) {
               //store position and halite amount of ideal dropoff location
@@ -298,9 +300,16 @@ game.initialize().then(async () => {
             ships[thatShip.id].targetDestination = nextDropoffSpot.position;
             logging.info(`Ship-${thatShip.id} is designated to build dropoff at ${nextDropoffSpot.position}`)
             designatedDropoffBuildPositions.push(nextDropoffSpot.position);
+            //after designating a ship, get a couple other ships to come
+            
+            
             break;
           }
         }
+      }
+      let possibleOtherShipPositions = search.circle(gameMap, nextDropoffSpot.position, 12);
+      //Find other ships to tag along the designated ship
+      for (let i = 0; i < possibleOtherShipPositions.length; i++) {
       }
     }
     
@@ -312,6 +321,7 @@ game.initialize().then(async () => {
       
       //If ship was given a target destination and it has reached it, set its mode to none to force the ship to rethink its current strategy.
       let reachedDropoffBuildPosition = false;
+      let nearNewDropoff = false;
       if (ships[id].targetDestination !== null) {
         if (ships[id].targetDestination.equals(ship.position)) {
           if (ships[id].mode === 'goingToBuildDropoff'){
@@ -343,6 +353,17 @@ game.initialize().then(async () => {
       }
       else if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || oldMode === 'return') {
         ships[id].mode = 'return';
+      }
+      else if (oldMode === 'goingToNewDropoff') {
+        ships[id].mode = 'goingToNewDropoff';
+        //check if close enough yet
+        if (ships[id].targetDestination !== null){
+          let distToNewDropoff = gameMap.calculate(ship.position, ships[id].targetDestination);
+          if (distToNewDropoff <= 4) {
+            ships[id].mode = 'none';
+            //reset its mode
+          }
+        }
       }
       /*
       else if (gameMap.get(ship.position).haliteAmount < hlt.constants.MAX_HALITE / 10){
@@ -397,7 +418,8 @@ game.initialize().then(async () => {
         if (shipCanMove) {
           switch(ships[id].mode) {
             case 'return':
-              //not optimized
+              //not optimized, could be optimized by storing the nearest dropoff for now, and only finding a new nearest dropoff if there is a new dropoff built
+              /*
               let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
               ships[id].targetDestination = nearestDropoff.position;
               //Last two arguments of below are true, false = avoid and dont attack
@@ -407,6 +429,11 @@ game.initialize().then(async () => {
                 avoidEnemy = false;
               }
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoidEnemy);
+              */
+              
+              //ships variable is changed within the function and the change is reflected outside as well
+              directions = movement.returnShip(gameMap, me, ship, ships);
+              
               break;
             case 'mine':
               let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
@@ -456,6 +483,9 @@ game.initialize().then(async () => {
               
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
               logging.info(`Ship-${ship.id} is going to build with directions: ${directions}`)
+              break;
+            case 'goingToNewDropoff':
+              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
               break;
           }
         }

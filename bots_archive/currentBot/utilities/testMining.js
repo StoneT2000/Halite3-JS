@@ -134,6 +134,148 @@ function findNextMiningPosition(gameMap, player, ship, range) {
   
 }
 
+
+//In the next 6 turns, find most optimal place to go
+function nextMiningPosition(gameMap, player, ship, range){
+  let omp = ship.position; //optimal mining position
+  let possiblePositions = search.circle(gameMap, ship.position, range);
+  let shipShouldReturn = false;
+  let numTurns = range * 2 + 2; //number of turns we predict ahead
+  let currentHaliteCollected = halitePotential(gameMap, ship.position, numTurns);
+  let currentCargo = ship.haliteAmount;
+  //find number of turns to overflow instead to calculate rate?
+
+  if (currentCargo + currentHaliteCollected >= 1000) {
+    numTurns = turnsToOverfill(gameMap, ship.haliteAmount, ship.position, gameMap.get(ship.position).haliteAmount, 0);
+    //logging.info(`Ship-${ship.id}: overfills in ${numTurns} turns after collecting ${currentHaliteCollected} halite adding to ${currentCargo} amount of halite`);
+    currentHaliteCollected = 1000 - currentCargo;
+    currentCargo = 1000;
+    
+    
+  }
+  else {
+    currentCargo + currentHaliteCollected;
+  }
+  let nearestDropoffAndDist = search.findNearestDropoff(gameMap, player, ship.position, true);
+  let nearestDropoff = nearestDropoffAndDist.nearest;
+  let distanceToDropoff = nearestDropoffAndDist.distance;
+  let maxHaliteRate = currentCargo/(numTurns)
+  //logging.info(`Ship-${ship.id}: costToPos:0, collects: ${currentHaliteCollected} at ${ship.position} in ${numTurns} turns of mining`);
+
+  for (let i = 0; i < possiblePositions.length; i++) {
+    let pos = possiblePositions[i]
+    let gameTile = gameMap.get(pos);
+    if (!gameTile.isOccupied && !gameTile.hasStructure){
+      
+      
+      
+      let distanceToPos = gameMap.calculateDistance(ship.position, pos); //Number of turns it takes to reach new position
+      let turnsSpent = numTurns;
+      
+      //mine 8 - distanceToPos * 2 turns, * 2 to account for the fact bot has to come back as well. We essentially compare mining farther with mining at original spot
+      let turnsMining = (numTurns - distanceToPos * 2);
+      let haliteRate = -1000;
+      
+      
+      let costToPos = costToMoveThere(gameMap, ship, pos);
+      let haliteCargo = ship.haliteAmount;
+      let haliteCargoThere = haliteCargo - costToPos;
+      
+      let haliteCollectedThere = halitePotential(gameMap, pos, turnsMining);
+      
+      if (haliteCargoThere + haliteCollectedThere >= 1000) {
+        turnsSpent = turnsToOverfill(gameMap, haliteCargoThere, pos, gameMap.get(pos).haliteAmount, 0);
+        haliteCollectedThere = 1000 - haliteCargoThere;
+        haliteCargoThere = 1000;
+      }
+      else {
+        haliteCargoThere = haliteCargoThere + haliteCollectedThere;
+      }
+      //HaliteCargoThere is the current halite cargo after mining
+      let haliteLeftThere = gameMap.get(pos).haliteAmount - haliteCollectedThere;
+      let costBackToOriginalPos = costToMoveThere(gameMap, ship, pos, haliteLeftThere);
+      
+      let netHalite = haliteCollectedThere - costBackToOriginalPos - costToPos;
+      
+      haliteRate = (haliteCargoThere - costBackToOriginalPos) / turnsSpent;
+      
+      if(haliteRate > maxHaliteRate) {
+        maxHaliteRate = haliteRate;
+        omp = pos;
+      }
+      //logging.info(`Ship-${ship.id}: costToPos:${costToPos}, collects: ${haliteCollectedThere} at ${pos} in ${turnsMining} turns of mining`);
+      /*
+      for (let k = 0; k <= 5; k++) {
+        
+        let haliteRate = -1000;
+        
+        let haliteCollectedHere = halitePotential(gameMap, pos, k);
+        let haliteCargo = ship.haliteAmount;
+        if (haliteCargo + haliteCollectedHere >= 1000) {
+          haliteCollectedHere = 1000 - haliteCargo;
+          haliteCargo = 1000;
+        }
+        else {
+          haliteCargo = haliteCargo + haliteCollectedHere;
+        }
+        
+        let haliteLeft = gameMap.get(ship.position).haliteAmount - haliteCollectedHere; //halite left on current tile
+        let costToPos = costToMoveThere(gameMap, ship, pos, haliteLeft);
+        let haliteCargoThere = haliteCargo - costToPos;
+        
+        let haliteCollectedThere = halitePotential(gameMap, pos, 5-k);
+        
+        if (haliteCargo + haliteCollectedThere >= 1000) {
+          haliteCollectedThere = 1000 - haliteCargo;
+          haliteCargo = 1000;
+        }
+        else {
+          haliteCargo = haliteCargo + haliteCollectedThere;
+        }
+        //by now, haliteCargo is the amount of halite in cargo there at position pos
+        let haliteLeftThere = gameMap.get(pos).haliteAmount - haliteCollectedThere;
+        let costToDropoff = costToMoveThere(gameMap, ship, nearestDropoff.position, haliteLeftThere)
+        
+        let netHalite = (haliteCargo - costToDropoff); //amount of halite that would be delivered
+        haliteRate = netHalite/ (turnsSpent + 5);
+        if(haliteRate > maxHaliteRate) {
+          maxHaliteRate = haliteRate;
+          omp = pos;
+        }
+      }
+      */
+      
+      
+    }
+  
+  }
+  if (shipShouldReturn === true) {
+    return {status: 'return'};
+  }
+  return {status: 'mine', position: omp};
+}
+
+//Finds halite rate
+function haliteRate(gameMap, position, ship, haliteBelow){
+  
+}
+
+function turnsToOverfill(gameMap, currentHalite, pos, haliteBelow, turnNum) {
+  let startingHalite = gameMap.get(pos);
+  if (haliteBelow) {
+    startingHalite = haliteBelow;
+  }
+  if (startingHalite === 0) {
+    return false;
+  }
+  let turnCount = turnNum += 1;
+  let extracted = Math.ceil(startingHalite * extractPercent);
+  if (currentHalite + extracted >= 1000) {
+    return turnCount;
+  }
+  return turnsToOverfill(gameMap, currentHalite+extracted, pos, startingHalite - extracted, turnCount);
+}
+
 //Returns the amount of halite needed for the ship using unsafeDirections to navigate to reach the targetPos with consideration of which direction is cheaper
 function costToMoveThere(gameMap, ship, targetPos, haliteBelow){
   //logging.info(`Ship-${ship.id}:Calculating totalhalitecost`);
@@ -217,4 +359,5 @@ module.exports = {
   costToMoveThere,
   findNextMiningPosition,
   halitePotential,
+  nextMiningPosition,
 }
