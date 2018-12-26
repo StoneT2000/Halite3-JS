@@ -29,6 +29,7 @@
         let botWinners = [];
         let terminatedBots = [];
         let gameScores = [];
+        let gameScoreDiff = gameData.stats['0'].score-gameData.stats['1'].score
         for (let key in gameData.stats) {
           let rank = gameData.stats[key].rank;
           if (gameData.stats[key].rank === 1) {
@@ -53,7 +54,7 @@
           }
         }
 
-        gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores, size:gameData.map_width, seed:gameData.map_seed});
+        gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores, size:gameData.map_width, seed:gameData.map_seed, scoreDiff: gameScoreDiff});
       }
       for (key in data[0].stats){
         winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
@@ -70,10 +71,12 @@
   });
   function outputTable(winRatios, gameResults) {
     document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
+    
     $("#tables").html('<table id="stats_for_nerds_table"><th>Bot #</th><th>Wins</th><th>Win Ratio</th><th>Points</th></table><table id="games_table"><th>Game #</th><th>Ranks</th><th>Scores</th><th>Seed &amp; Map Size</th><th>Terminated Bots</th></table>');
     for (key in winRatios) {
       $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td><td>" + points[key] + "</td></tr>")
     }
+    let totalScoreDiff = 0;
     for (let i = 0; i < gameResults.length; i++) {
       let formattedRanks = "";
       let formattedTerminated = "";
@@ -93,7 +96,11 @@
       for (let j = 0; j < gameResults[i].terminated.length; j++) {
         formattedTerminated += gameResults[i].terminated[j];
       }
+      totalScoreDiff += gameResults[i].scoreDiff;
       $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>"+ gameResults[i].seed+"<br>"+ gameResults[i].size + " x " + gameResults[i].size +"</td><td>" + formattedTerminated + "</td></tr>")
+      if (numPlayers === 2){
+        document.getElementById('scoreDiff').innerHTML = "Total Score Difference: " + totalScoreDiff;
+      }
     }
   }
   function filterData(data, kt) {
@@ -200,6 +207,7 @@ td {
   <div class="container">
     <button onclick="saveAs(csvblob, 'data.csv');">Download CSV Data</button>
     <h1 id="header">Results</h1>
+    <h3 id="scoreDiff">Total Score Difference: </h3>
     <button onclick="displayFilteredData(data,{map_width:32})">Display 32x32 games only</button>
     <button onclick="displayFilteredData(data,{map_width:40})">Display 40x40 games only</button>
     <button onclick="displayFilteredData(data,{map_width:48})">Display 48x48 games only</button>
