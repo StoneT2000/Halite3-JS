@@ -230,6 +230,13 @@ function worthAttacking(gameMap, ship, oship) {
     possibleCollisonPos = ship.position.directionalOffset(collisionDirections[0]);
   }
 
+  //if possible collision Position is over enemy structure, dont do it
+  /*
+  let thatStructure = gameMap.get(possibleCollisionPos).structure;
+  if (thatStructure.owner !== null && thatStructure.owner !== ship.owner) {
+    return false;
+  }
+  */
   if(1.5 * ship.haliteAmount < oship.haliteAmount) {
     let shipsNearby = search.numShipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
     let friendlyNearby = shipsNearby.friendly;
@@ -242,10 +249,32 @@ function worthAttacking(gameMap, ship, oship) {
   
 }
 
+function returnShip(gameMap, player, ship, ships) {
+  //not optimized, could be optimized by storing the nearest dropoff for now, and only finding a new nearest dropoff if there is a new dropoff built
+  let nearestDropoff = search.findNearestDropoff(gameMap, player, ship.position);
+  let id = ship.id;
+  ships[id].targetDestination = nearestDropoff.position;
+  //Last two arguments of below are true, false = avoid and dont attack
+  let distanceToNearestDropoffWhenReturning = gameMap.calculateDistance(ship.position, nearestDropoff.position);
+  let avoidEnemy = true;
+  if (distanceToNearestDropoffWhenReturning <= 1){
+    avoidEnemy = false;
+  }
+  //or if unit is 2 away from dropoff but there is an enemy on top of the dropoff
+  let oship = gameMap.get(nearestDropoff.position).ship;
+  if (distanceToNearestDropoffWhenReturning <= 2 && oship !== null && oship.owner !== ship.owner){
+    avoidEnemy = false;
+  }
+  let directions = viableDirections(gameMap, ship, ships[id].targetDestination, avoidEnemy);
+  return directions;
+}
+
+
 module.exports = {
   canMove,
   viableDirections,
   finalMove,
   moveAwayFromSelf,
-  worthAttacking
+  worthAttacking,
+  returnShip,
 }

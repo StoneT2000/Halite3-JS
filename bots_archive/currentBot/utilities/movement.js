@@ -231,17 +231,26 @@ function worthAttacking(gameMap, ship, oship) {
   }
 
   //if possible collision Position is over enemy structure, dont do it
-  /*
-  let thatStructure = gameMap.get(possibleCollisionPos).structure;
-  if (thatStructure.owner !== null && thatStructure.owner !== ship.owner) {
+  
+  let thatStructure = gameMap.get(possibleCollisonPos).structure;
+  if (thatStructure !== null && thatStructure.owner !== ship.owner) {
     return false;
   }
-  */
+  
   if(1.5 * ship.haliteAmount < oship.haliteAmount) {
-    let shipsNearby = search.numShipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
-    let friendlyNearby = shipsNearby.friendly;
-    if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy){
-      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly}, e:${shipsNearby.enemy} at ${possibleCollisonPos}`)
+    let shipsNearby = search.shipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
+    let friendlyNearby = shipsNearby.friendly.length;
+    
+    let haliteCargoSpace = 0;
+    for (let k = 0; k < shipsNearby.friendly.length; k++) {
+      if (shipsNearby.friendly[k].id !== ship.id){
+        haliteCargoSpace += (1000 - shipsNearby.friendly[k].haliteAmount);
+      }
+    }
+    
+    //logging.info(`Ship-${ship.id} has ${haliteCargoSpace} space in nearby ships`);
+    if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy.length && oship.haliteAmount <= haliteCargoSpace){
+      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly.length}, e:${shipsNearby.enemy.length} at ${possibleCollisonPos}`)
       return true;
     }
   }

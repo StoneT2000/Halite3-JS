@@ -79,6 +79,11 @@ game.initialize().then(async () => {
   
   let designatedDropoffBuildPositions = []; //positions where a ship is already going to build at
   
+  let incomingFShips = {}; //array of arrays of ship ids coming to a dropoff place. Add this to the number of ships in vicinity count when figuring out which loitering ships should force move somewhere.
+  //incomingFShips[id1][k], id1=dropoff id, kth element gives kth ship
+  
+  let maxDropoffBuildDistance = 12; //max distance dropoff build place can be from nearest ship
+  
   while (true) {
     
     let start = new Date().getTime();
@@ -87,10 +92,9 @@ game.initialize().then(async () => {
     let shipDesiredPositions = {};
     
     
-    
     await game.updateFrame();
 
-    
+
    
     const commandQueue = [];
 
@@ -109,13 +113,15 @@ game.initialize().then(async () => {
         let gameMapPosition = (new Position(i,j));
         let nearestDropoffToHere = search.findNearestDropoff(gameMap, me, gameMapPosition);
         let distanceToNearestDropoff = gameMap.calculateDistance(gameMapPosition, nearestDropoffToHere.position);
-        
         //check if another ship has already taken this spot
         let buildableLocation = true;
         for (let k = 0; k < designatedDropoffBuildPositions.length; k++) {
           if (gameMapPosition.equals(designatedDropoffBuildPositions[k])) {
             buildableLocation = false;
-            break;
+          }
+          let distToDesignatedPlace = gameMap.calculateDistance(gameMapPosition, designatedDropoffBuildPositions[k]);
+          if (distToDesignatedPlace < distanceToNearestDropoff) {
+            distanceToNearestDropoff = distToDesignatedPlace;
           }
         }
         if (gameMapPosition.hasStructure) {
@@ -125,9 +131,9 @@ game.initialize().then(async () => {
           let haliteInRadiusOfThisTile = mining.totalHaliteInRadius(gameMap, gameMapPosition, 6);
 
           if (haliteInRadiusOfThisTile >= minHaliteAroundDropoff) {
-            //9 = max distance at which we allow ships to run and build dropoff
-            let shipsInRadius = search.numShipsInRadius(gameMap, me.shipyard.owner, gameMapPosition, 9);
-            if (shipsInRadius.friendly >= 1) {
+            //12 = max distance at which we allow ships to run and build dropoff
+            let shipsAround = search.shipsInRadius(gameMap, me.shipyard.owner, gameMapPosition, maxDropoffBuildDistance);
+            if (shipsAround.friendly.length >= 1) {
               //store position and halite amount of ideal dropoff location
               possibleDropoffSpots.push({position: gameMapPosition, halite: haliteInRadiusOfThisTile});
             }
@@ -135,6 +141,40 @@ game.initialize().then(async () => {
         }
       }
     }
+    //goingToNewDropoff
+    //dropoffsSortedByHalite contains all the dropoffs plus shipyard and the amount of halite in a 9 unit radius along with the number of ships they have nearby
+    let dropoffsSortedByHalite = [{structure: me.shipyard, halite: mining.totalHaliteInRadius(gameMap, me.shipyard.position, 9)}];
+    if (incomingFShips[me.shipyard.id] === undefined) {
+      incomingFShips[me.shipyard.id] = [];
+    }
+    for (const dropoff of me.getDropoffs()) {
+      if (incomingFShips[dropoff.id] === undefined) {
+        incomingFShips[dropoff.id] = [];
+        //logging.info(`Dropoff-${dropoff.id}; ${incomingFShips[dropoff.id].length}`);
+      }
+      
+      //define if undefined. Also check if the ship is still alive. if not, remove from incoming
+      let newArr = [];
+      for (let k = 0; k < incomingFShips[dropoff.id].length; k++) {
+        
+        if (me.hasShip(incomingFShips[dropoff.id][k])) {
+          newArr.push(incomingFShips[dropoff.id][k]);
+        }
+        else {
+          //logging.info(`Ship-${incomingFShips[dropoff.id][k]} collided somewhere`);
+        }
+      }
+      incomingFShips[dropoff.id] = JSON.parse(JSON.stringify(newArr));
+      
+      let totalHaliteAroundDropoff = mining.totalHaliteInRadius(gameMap, dropoff.position, 9);
+      let shipsNear = search.shipsInRadius(gameMap, me.shipyard.owner, dropoff.position, 6);
+      dropoffsSortedByHalite.push({structure:dropoff, halite: totalHaliteAroundDropoff, fships: shipsNear.friendly.length});
+    }
+    dropoffsSortedByHalite.sort(function(a,b){
+      return b.halite - a.halite;
+    });
+    
+    
     
     //DETERMINE STRATEGIES:
     //let ext = mining.extractPercent;
@@ -164,14 +204,21 @@ game.initialize().then(async () => {
     let tempId = -10;
     let localHaliteCount = me.haliteAmount;
     let buildShip = false;
-    let buildDropoffs = false; //whether we should let ships start to be designated to build dropoff
+    let buildDropoffs = true; //whether we should let ships start to be designated to build dropoff
     if ((game.turnNumber < 0.65 * hlt.constants.MAX_TURNS && numShips <= 1.5*Math.sqrt(mapSize)) &&
       me.haliteAmount >= hlt.constants.SHIP_COST && averageHalite >= minAverageHaliteNeeded) {
-      if (numDropoffs < maxDropoffs) {
+      //we stack up halite if there is a ship being designated to build. no longer use numDropoffs < maxDropoffs argument
+      if (designatedDropoffBuildPositions.length >= 1) {
         //this shouldnt be >= drop off cost, could be less due to existing halite in cargo and ground
         if (me.haliteAmount >= hlt.constants.DROPOFF_COST + 500) {
           buildShip = true;
           
+        }
+      }
+      else if (numDropoffs < maxDropoffs) {
+        //this way the building ship doesn't wait forever and its tagged along ships don't go all the way back to shipyard
+        if (me.haliteAmount >= hlt.constants.DROPOFF_COST - 500) {
+          buildShip = true;
         }
       }
       else {
@@ -185,15 +232,17 @@ game.initialize().then(async () => {
         tempId -= 1; 
       }
     }
-    if (localHaliteCount >= hlt.constants.DROPOFF_COST) {
+    /*
+    if (localHaliteCount >= hlt.constants.DROPOFF_COST/2) {
       buildDropoffs = true;
     }
-    
+    */
     numShips = 0;
     let shipsDesignatedToBuild = 0; //number of ships designated to go and build dropoffs
     let shipsThatCantMove = []; //array of ships that don't have enough halite to move
     let shipsThatAreReturning = []; //array of ships that are on return mode
     let shipsThatArePerformingFinalReturn = []; //array of ships on the final mode
+    let shipsThatAreBuilding = []; //array of ships that are trying to build a dropoff
     let otherShips = []; //all other ships
     let prioritizedShips = []; //the prioritized array of ships in which movements and decisions should be made
     
@@ -230,6 +279,10 @@ game.initialize().then(async () => {
       else if (ships[id].mode === 'final') {
         shipsThatArePerformingFinalReturn.push(ship);
       }
+      else if (ships[id].mode === 'buildDropoff') {
+        shipsThatAreBuilding.push(ship);
+        shipsDesignatedToBuild += 1;
+      }
       else {
         if (ships[id].mode === 'goingToBuildDropoff'){
           shipsDesignatedToBuild += 1;
@@ -241,6 +294,9 @@ game.initialize().then(async () => {
     //Build the prioritized ships array
     for (let i = 0; i < shipsThatCantMove.length; i++) {
       prioritizedShips.push(shipsThatCantMove[i]);
+    }
+    for (let i = 0; i < shipsThatAreBuilding.length; i++) {
+      prioritizedShips.push(shipsThatAreBuilding[i]);
     }
     for (let i = 0; i < shipsThatArePerformingFinalReturn.length; i++) {
       prioritizedShips.push(shipsThatArePerformingFinalReturn[i]);
@@ -287,11 +343,11 @@ game.initialize().then(async () => {
       })
       let nextDropoffSpot = possibleDropoffSpots[0];
       //IMPROVEMENT: Slightly repetitive to search again as it was done already when going through the entire map to find ideal dropoff locations
-      let possibleShipPositions = search.circle(gameMap, nextDropoffSpot.position, 9);
+      let possibleShipPositions = search.circle(gameMap, nextDropoffSpot.position, maxDropoffBuildDistance);
       for (let i = 0; i < possibleShipPositions.length; i++) {
         let possibleTileWithShip = gameMap.get(possibleShipPositions[i]);
         let thatShip = possibleTileWithShip.ship;
-        //check if there is a ship within 6 units radius and is one of our ships
+        //check if there is a ship within maxDropoffBuildDistance units radius and is one of our ships
         if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
           //then designate that ship to build the dropoff
           if (ships[thatShip.id].mode !== 'goingToBuildDropoff'){
@@ -307,9 +363,35 @@ game.initialize().then(async () => {
           }
         }
       }
-      let possibleOtherShipPositions = search.circle(gameMap, nextDropoffSpot.position, 12);
+      let possibleOtherShipPositions = search.circle(gameMap, nextDropoffSpot.position, 20);
       //Find other ships to tag along the designated ship
+      let possibleShipsToTag = [];
       for (let i = 0; i < possibleOtherShipPositions.length; i++) {
+        let possibleTileWithShip = gameMap.get(possibleOtherShipPositions[i]);
+        let thatShip = possibleTileWithShip.ship;
+        if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
+          let thatMode = ships[thatShip.id].mode;
+          if (thatMode !== 'return' && thatMode !== 'goingToBuildDropoff' && thatMode !== 'buildDropoff') {
+            possibleShipsToTag.push({ship:thatShip, distance: gameMap.calculateDistance(thatShip.position, nextDropoffSpot.position)});
+          }
+        }
+      }
+      //get at least 1/numofdropofss of the ships to go to the new dropoff
+      let desiredNumShips = (1/(maxDropoffs)) * numShips;
+      
+      //sort by distance, least distance first
+      possibleShipsToTag.sort(function(a,b){
+        return a.distance - b.distance;
+      })
+      for (let i = 0; i < possibleShipsToTag.length; i++) {
+        if (i < desiredNumShips) {
+          ships[possibleShipsToTag[i].ship.id].mode = 'goingToNewDropoff';
+          ships[possibleShipsToTag[i].ship.id].targetDestination = nextDropoffSpot.position;
+          //logging.info(`Ship-${possibleShipsToTag[i].ship.id} is tagged to go near ${nextDropoffSpot.position}`);
+        }
+        else {
+          break;
+        }
       }
     }
     
@@ -346,9 +428,11 @@ game.initialize().then(async () => {
         //someone built a structure there, go mine instead
         if (gameMap.get(ships[id].targetDestination).hasStructure) {
           ships[id].mode = 'mine';
+          removePositionFromArr(ships[id].targetDestination, designatedDropoffBuildPositions);
         }
       }
-      else if (reachedDropoffBuildPosition === true) {
+      //if ship reached position, it turns to building mode. It will try to always build
+      else if (reachedDropoffBuildPosition === true || oldMode === 'buildDropoff') {
         ships[id].mode = 'buildDropoff';
       }
       else if (ship.haliteAmount >= hlt.constants.MAX_HALITE / 1.02 || oldMode === 'return') {
@@ -358,13 +442,15 @@ game.initialize().then(async () => {
         ships[id].mode = 'goingToNewDropoff';
         //check if close enough yet
         if (ships[id].targetDestination !== null){
-          let distToNewDropoff = gameMap.calculate(ship.position, ships[id].targetDestination);
+          let distToNewDropoff = gameMap.calculateDistance(ship.position, ships[id].targetDestination);
           if (distToNewDropoff <= 4) {
             ships[id].mode = 'none';
             //reset its mode
           }
         }
       }
+     
+
       /*
       else if (gameMap.get(ship.position).haliteAmount < hlt.constants.MAX_HALITE / 10){
         ships[id].mode = 'mine';
@@ -372,6 +458,29 @@ game.initialize().then(async () => {
       */
       else if (gameMap.get(ship.position).hasStructure) {
         ships[id].mode = 'mine'; //force unit to leave to allow others in
+      }
+      //Detect if ship is a loiterer. If the best place to mine around isn't the shipyard itself, then if the ship is loitering around, e.g mining in lowly concentrated halite area, force it move to a new dropoff loc. Also don't force it there if theres already too many ships near the other dropoff
+      else if(dropoffsSortedByHalite[0].structure.position !== me.shipyard.position) {
+        //we use numships/maxdropoffs to achieve an approximate even dist'n of ships on dropoffs, kinda
+        //search all dropoffs by halite amounts, and check if there is space to send loitering ships there
+        for (let i = 0; i < dropoffsSortedByHalite.length; i++) {
+          let dropoffId = dropoffsSortedByHalite[i].structure.id;
+          //logging.info(`Ship-${id}; looking for dropoff-${dropoffId}`);
+          let numIncomingFShips = incomingFShips[dropoffId].length;
+          
+          //min with 8 is quite arbitrary
+          if (dropoffsSortedByHalite[i].fships + numIncomingFShips <= Math.min(numShips/maxDropoffs, 5)) {
+            let haliteAroundHere = mining.totalHaliteInRadius(gameMap, ship.position, 9);
+            if (2 * haliteAroundHere < dropoffsSortedByHalite[i].halite) {
+              ships[id].mode = 'goingToNewDropoff';
+              //logging.info(`Ship-${ship.id} was caught loitering, sent to ${dropoffsSortedByHalite[i].structure.position}, which has ${dropoffsSortedByHalite[i].fships} ships near`);
+              ships[id].targetDestination = dropoffsSortedByHalite[0].structure.position;
+              incomingFShips[dropoffId].push(id);
+              break;
+            }
+          }
+        }
+        
       }
       else {
         ships[id].mode = 'mine';
@@ -466,6 +575,10 @@ game.initialize().then(async () => {
               break;
             case 'buildDropoff':
               directions = [Direction.Still];
+              
+              //store its directions to look for conflicts in the future. Fixes bug where ships that are building get collided into
+              shipDirections[id] = directions;
+              shipDesiredPositions[id] = [ship.position];
               break;
             case 'final':
               let finalNearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
@@ -482,7 +595,7 @@ game.initialize().then(async () => {
               //keep going to the build place as long as its still has no structure
               
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
-              logging.info(`Ship-${ship.id} is going to build with directions: ${directions}`)
+              //logging.info(`Ship-${ship.id} is going to build with directions: ${directions}`)
               break;
             case 'goingToNewDropoff':
               directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
@@ -512,7 +625,9 @@ game.initialize().then(async () => {
           commandQueue.push(ship.makeDropoff());
           logging.info(`Building with ship-${id}`)
           localHaliteCount -= (hlt.constants.DROPOFF_COST - ship.haliteAmount - gameMap.get(ship.position).haliteAmount);
-          //we dont' remove the newly built on position from designatedDropoffBuildPositions array because u can't build on another structure anyway.
+
+          removePositionFromArr(ship.position, designatedDropoffBuildPositions);
+
           numDropoffs += 1;
           delete shipDirections[id];
           delete shipDesiredPositions[id];
@@ -586,6 +701,7 @@ game.initialize().then(async () => {
           }
           
         }
+        //logging.info(`Ship-${ship.id} at ${ship.position} final direction order: ${directions}`);
       }
     }
     
@@ -610,3 +726,12 @@ game.initialize().then(async () => {
     logging.info(`Turn took: ${time} ms`);
   }
 });
+
+function removePositionFromArr(pos, arr){
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i].equals(pos)) {
+      arr.splice(i,1);
+      break;
+    }
+  }
+}

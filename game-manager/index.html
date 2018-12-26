@@ -53,7 +53,7 @@
           }
         }
 
-        gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores, size:gameData.map_width});
+        gameResults.push({ranks:botWinners, terminated:terminatedBots, scores:gameScores, size:gameData.map_width, seed:gameData.map_seed});
       }
       for (key in data[0].stats){
         winRatios[key] = ((wins[key]/totalGames) * 100).toFixed(2) + "%";
@@ -70,7 +70,7 @@
   });
   function outputTable(winRatios, gameResults) {
     document.getElementById('header').innerHTML = "Results: " + totalGames + " games";
-    $("#tables").html('<table id="stats_for_nerds_table"><th>Bot #</th><th>Wins</th><th>Win Ratio</th><th>Points</th></table><table id="games_table"><th>Game #</th><th>Ranks</th><th>Scores</th><th>Map Size</th><th>Terminated Bots</th></table>');
+    $("#tables").html('<table id="stats_for_nerds_table"><th>Bot #</th><th>Wins</th><th>Win Ratio</th><th>Points</th></table><table id="games_table"><th>Game #</th><th>Ranks</th><th>Scores</th><th>Seed &amp; Map Size</th><th>Terminated Bots</th></table>');
     for (key in winRatios) {
       $("#stats_for_nerds_table").append("<tr><td>" + key + "</td><td>" + wins[key] + "</td><td>" + winRatios[key] +"</td><td>" + points[key] + "</td></tr>")
     }
@@ -93,7 +93,7 @@
       for (let j = 0; j < gameResults[i].terminated.length; j++) {
         formattedTerminated += gameResults[i].terminated[j];
       }
-      $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>" + gameResults[i].size + " x " + gameResults[i].size +"</td><td>" + formattedTerminated + "</td></tr>")
+      $("#games_table").append("<tr><td>" + (i+1)+"</td><td>" + formattedRanks + "</td><td>" + formattedScores + "</td><td>"+ gameResults[i].seed+"<br>"+ gameResults[i].size + " x " + gameResults[i].size +"</td><td>" + formattedTerminated + "</td></tr>")
     }
   }
   function filterData(data, kt) {
@@ -217,7 +217,7 @@ td {
       <th>Game #</th>
       <th>Ranks</th>
       <th>Scores</th>
-      <th>Map Size</th>
+      <th>Seed &amp; Map Size</th>
       <th>Terminated Bots</th>
     </table>
     </div>

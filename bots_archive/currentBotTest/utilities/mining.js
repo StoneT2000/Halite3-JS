@@ -16,6 +16,9 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
   let haliteMoveCost = haliteHere * moveCostPercent;
   let newHalitePotential = -haliteMoveCost;
   let currentHalitePotential = halitePotential(gameMap, ship.position, kTurns);
+  if (currentHalitePotential > 1000 - ship.haliteAmount) {
+    currentHalitePotential = 1000 - ship.haliteAmount
+  }
   let id = ship.id;
   let possibleDestinations = search.circle(gameMap, ship.position, range);
   /*
@@ -27,7 +30,10 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
   for (let i = 0; i < possibleDestinations.length; i++) {
     let newTile = gameMap.get(possibleDestinations[i]);
     let turnOffset = 2;
-    if (i <= 4){
+    if (i === 0) {
+      turnOffset = 0;
+    }
+    else if (i <= 4){
       turnOffset = 2;
     }
     else if (i <= 12) {
@@ -49,6 +55,10 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
       //unoccupiedPositions.push(possibleDestinations[i]);
 
       let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations[i], kTurns - turnOffset);
+      if (thisHaliteExtracted > 1000 - ship.haliteAmount) {
+        thisHaliteExtracted = 1000 - ship.haliteAmount
+      }
+      
       let thisHaliteStart = newTile.haliteAmount;
       let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent;
 
@@ -155,10 +165,67 @@ function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
   return omp;
   
 };
+function costToMoveThere(gameMap, ship, targetPos, haliteBelow){
+  //logging.info(`Ship-${ship.id}:Calculating totalhalitecost`);
+  let currentPosition = ship.position;
+  
+  //If ship is on target position, no halite cost to move there
+  if (currentPosition.equals(targetPos)){
+    return 0;
+  }
+  
+  let totalHaliteCost = Math.floor(gameMap.get(ship.position).haliteAmount * moveCostPercent);
+  
+  //use the argument haliteBelow to predict future costs. Supposing that the halite below is going to be different than what it is now due to mining
+  if (haliteBelow) {
+    //logging.info(`Ship-${ship.id} halitebelow given`);
+    totalHaliteCost = Math.floor(haliteBelow * moveCostPercent);
+  }
+  
+  
+
+  //while the current ghost position isn't the target, find the next move the ship would take and add to cost
+  //!currentPosition.equals(targetPos)
+  let k = 0;
+  while (!currentPosition.equals(targetPos)) {
+    //We ignore enemy ships when calculating this
+    let directionsToThere = gameMap.getUnsafeMoves(currentPosition, targetPos);
+    if (directionsToThere.length >=2 ) {
+      let halite1 = (gameMap.get(currentPosition.directionalOffset(directionsToThere[0]))).haliteAmount;
+      let halite2 = (gameMap.get(currentPosition.directionalOffset(directionsToThere[1]))).haliteAmount;
+      if (halite2 < halite1) {
+        directionsToThere[0] = directionsToThere[1];
+      }
+    }
+    //for some reason using viableDirections with avoiding set to false results in crashes, communication failed. I'm thinking its an infinite while loop but it if it was, the log below would constantly be logging but it isn't.
+    //let directionsToThere = movement.viableDirections(gameMap, ship, targetPos, false)
+    //logging.info(`${ship.id}: ${directionsToThere}`)
+    if (k !== 0) {
+      totalHaliteCost += Math.floor(gameMap.get(currentPosition).haliteAmount * moveCostPercent);
+    }
+    currentPosition = gameMap.normalize(currentPosition.directionalOffset(directionsToThere[0]));
+    k++;
+    
+    //logging.info(`Ship-${ship.id}: Directions: ${directionsToThere}`);
+  }
+  return totalHaliteCost;
+  
+  
+}
+
 //Determine halitePotential gained in these turns at this position
-function halitePotential(gameMap, position, turns) {
+function halitePotential(gameMap, position, turns, haliteBelow) {
   let haliteHere = gameMap.get(position).haliteAmount;
-  return ((1 - (Math.pow(0.75, turns))) / (1 - 0.75))*extractPercent*haliteHere;
+  if (haliteBelow) {
+    haliteHere = haliteBelow;
+  }
+  if (haliteBelow <= 0) {
+    return gameMap.get(position).haliteAmount;
+  }
+  if (turns === 0) {
+    return gameMap.get(position).haliteAmount - haliteHere;
+  }
+  return halitePotential(gameMap, position, turns-1, haliteHere - Math.ceil(haliteHere*0.25));
 }
 
 //Find amount of halite in surrounding area
