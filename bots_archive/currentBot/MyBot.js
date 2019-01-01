@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-1v2');
+  await game.ready('ST-Bot-Jan-1v3');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -30,17 +30,19 @@ game.initialize().then(async () => {
   let averageHalite = 0;
   let minAverageHaliteNeeded = 50; //average halite needed in order to make ships
   let numPlayers = 0;
-  
+  let crashRatio = 1.5;
   for (let key of game.players){
     numPlayers += 1;
   }
   logging.info(`There are ${numPlayers} players`);
   if (numPlayers === 4) {
     minAverageHaliteNeeded = 60;
+    crashRatio = 2;
   }
   averageHalite = search.totalHaliteOnMap(gameMap);
   averageHalite = averageHalite / mapSize;
   logging.info(`Average Halite: ${averageHalite}`);
+  
   
   //How far ship is willing to look for potential mining spots. early game, its 1, we want more ships early on
   //later set it to two
@@ -132,7 +134,8 @@ game.initialize().then(async () => {
           if (haliteInRadiusOfThisTile >= minHaliteAroundDropoff) {
             //12 = max distance at which we allow ships to run and build dropoff
             let shipsAround = search.shipsInRadius(gameMap, me.shipyard.owner, gameMapPosition, maxDropoffBuildDistance);
-            if (shipsAround.friendly.length >= 1) {
+            let shipsAroundClose = search.shipsInRadius(gameMap, me.shipyard.owner, gameMapPosition, 6);
+            if (shipsAround.friendly.length >= 1 && (shipsAroundClose.friendly.length >= 0.3 * shipsAroundClose.enemy.length || shipsAroundClose.enemy.length <= 2)) {
               //store position and halite amount of ideal dropoff location
               possibleDropoffSpots.push({position: gameMapPosition, halite: haliteInRadiusOfThisTile});
             }
@@ -445,6 +448,13 @@ game.initialize().then(async () => {
           ships[id].mode = 'mine';
           removePositionFromArr(ships[id].targetDestination, designatedDropoffBuildPositions);
         }
+        let shipsCloseBy = search.shipsInRadius(gameMap, me.shipyard.owner, ships[id].targetDestination, 6);
+        //logging.info(`Ship-${ship.id} has ${shipsCloseBy.friendly.length} friendlies and ${shipsCloseBy.enemy.length} enemies near target `);
+        if (shipsCloseBy.friendly.length < 0.3 * shipsCloseBy.enemy.length && shipsCloseBy.enemy.length >= 2) {
+          //too many enemies, dont build
+          ships[id].mode = 'mine';
+          removePositionFromArr(ships[id].targetDestination, designatedDropoffBuildPositions);
+        }
       }
       //if ship reached position, it turns to building mode. It will try to always build
       else if (reachedDropoffBuildPosition === true || oldMode === 'buildDropoff') {
@@ -484,7 +494,7 @@ game.initialize().then(async () => {
           let numIncomingFShips = incomingFShips[dropoffId].length;
           
           //min with 8 is quite arbitrary
-          if (dropoffsSortedByHalite[i].fships + numIncomingFShips <= Math.min(numShips/maxDropoffs, 5)) {
+          if (dropoffsSortedByHalite[i].fships + numIncomingFShips <= Math.min(numShips/maxDropoffs, 10)) {
             let haliteAroundHere = mining.totalHaliteInRadius(gameMap, ship.position, 9);
             if (2 * haliteAroundHere < dropoffsSortedByHalite[i].halite) {
               ships[id].mode = 'goingToNewDropoff';
@@ -579,7 +589,7 @@ game.initialize().then(async () => {
                 
                 //IMPROVEMENT: Doesn't check for which ship is best to collide into if there are several ones worth attacking
                 if (oship !== null && oship.owner !== ship.owner) {
-                  if (movement.worthAttacking(gameMap, ship, oship)) {
+                  if (movement.worthAttacking(gameMap, ship, oship, crashRatio)) {
                     ships[id].targetDestination = oship.position;
                     attackOtherShip = true;
                     avoid = false;
