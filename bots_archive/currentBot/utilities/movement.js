@@ -25,9 +25,9 @@ function canMove(gameMap, ship) {
 //4. If no absoluteSafeDirections available, prioritize safeDirections in order which they have less enemies directly near
 
 
-function viableDirections(gameMap, ship, targetPos, avoid) {
+function viableDirections(gameMap, ship, targetPositions, avoid) {
   //Gets directions that move towards the target position
-  let directions = gameMap.getUnsafeMoves(ship.position, targetPos);
+  let directions = gameMap.getUnsafeMoves(ship.position, targetPositions[0]);
   
   if (directions.length === 0){
     //If there are no directions to the targetPosition, set still as a direction
@@ -88,12 +88,12 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
         }
       }
       if (isThisAbsoluteSafe === true) {
-        let distanceAway = gameMap.calculateDistance(possiblePosition,targetPos);
+        let distanceAway = gameMap.calculateDistance(possiblePosition,targetPositions[0]);
         //logging.info(`Ship-${ship.id} at ${ship.position} has absolute safe direction: ${allDirections[i]} ${distanceAway} away`);
         absoluteSafeDirections.push({dir:allDirections[i], dist:distanceAway, enemies: numEnemies});
       }
       if (isThisSafe === true) {
-        safeDirections.push({dir:allDirections[i], dist:gameMap.calculateDistance(possiblePosition,targetPos), enemies: numEnemies})
+        safeDirections.push({dir:allDirections[i], dist:gameMap.calculateDistance(possiblePosition,targetPositions[0]), enemies: numEnemies})
       }
     }
     //Sort absolute safe directions by which is closer to target position
@@ -117,13 +117,19 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
     }
     
   }
+  //By now, we have an array of absolute safe directions and safe directions, chosen dependent on enemies nearby and whichever is closer to targetPositions[0], the best target position for the ship at the time
+  
   
   //If trying to avoid enemy ships but there are no absolutely safe directions, then choose safe directions with least enemies around and out of those, find the closest to target
+  
+  let directionsAndDistance = [];
   if (avoid === true) {
     if (absoluteSafeDirections.length === 0) {
       if (safeDirections.length === 0) {
         //if there are 0 safe directions
-        directions = [Direction.Still];
+        
+        directionsAndDistance = [{dir:Direction.Still, dist: 0}];
+        
       }
       else {
         //If there are some safe directions, look through them
@@ -143,19 +149,78 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
         possibleSafeDirections.sort(function(a,b){
           return a.dist - b.dist;
         })
-        directions = possibleSafeDirections.map(function(a){
-          return a.dir;
+        directionsAndDistance = possibleSafeDirections.map(function(a){
+          return a;
         });
       }
     }
     else {
-      directions = absoluteSafeDirections.map(function(a){
-        return a.dir;
+      directionsAndDistance = absoluteSafeDirections.map(function(a){
+        return a;
       });
     }
   }
-  //By now, directions will include the safest directions possible that also are the closest to the targetPos
+
+  //By now, directionsAndDistance will include the safest directions (and dist) possible ordered by closeness to targetPositions[0]
+  
+  //Now we build a new array of directions that go into the direction of other less desired target positions
+  let otherDirections = [];
+  for (let k = 1; k < targetPositions.length; k++) {
+    let nextOtherDirections = gameMap.getUnsafeMoves(ship.position, targetPositions[k]);
+    for (let t = 0; t< nextOtherDirections.length; t++) {
+      otherDirections.push(nextOtherDirections[t]);
+    }
+  }
+  //logging.info(`Ship-${ship.id} has other directions: ${otherDirections}`)
+  //using this new array, we concat it so only unique directions are left. Then compare with the current directions array that is all safe
+  let uniqueOtherDirections = [];
+  for (let k = 0; k < otherDirections.length; k++) {
+    let unique = true;
+    for (let t = 0; t < uniqueOtherDirections.length; t++) {
+      if (uniqueOtherDirections[t].equals(otherDirections[k])) {
+        unique = false;
+      }
+    }
+    if (unique === true) {
+      uniqueOtherDirections.push(otherDirections[k]);
+    }
+  }
+  logging.info(`Ship-${ship.id} has other unique directions: ${uniqueOtherDirections}`);
+  //By now, uniqueOtherDirections is ordered by desirability of target position that the direction goes to.
+  
+  //check in the current directions list for the ones that are the same
+  if (directionsAndDistance.length === 1) {
+    
+    directions = [directionsAndDistance[0].dir];
+  }
+  else if (directionsAndDistance.length >= 2) {
+    let newSortedDirectionsByOtherTargets = [];
+    //first leave the best directions alone
+    let startIteration = 0;
+    if (directionsAndDistance[0].dist === directionsAndDistance[1].dist) {
+      startIteration = 2;
+      newSortedDirectionsByOtherTargets = [directionsAndDistance[0].dir, directionsAndDistance[1].dir];
+    }
+    else {
+      startIteration = 1;
+      newSortedDirectionsByOtherTargets = [directionsAndDistance[0].dir];
+    }
+    for (let k = 0; k < uniqueOtherDirections.length; k++) {
+      for (let t = startIteration; t < directionsAndDistance.length; t++) {
+        if (uniqueOtherDirections[k].equals(directionsAndDistance[t].dir)){
+          newSortedDirectionsByOtherTargets.push(directionsAndDistance[t].dir);
+        }
+        
+      }
+    }
+    directions = newSortedDirectionsByOtherTargets;
+  }
+  
   //Add remaining directions to allow flexibility in movement in case of conflicts
+  //Then sort the remaining directions by uniqueOtherDirections
+  
+  
+  
   let diffDir = [];
   for (let i = 0; i < allDirections.length; i++) {
     let isItThere = false;
@@ -168,9 +233,43 @@ function viableDirections(gameMap, ship, targetPos, avoid) {
       diffDir.push(allDirections[i]);
     }
   }
-  for (let i = 0; i < diffDir.length; i++){
-    directions.push(diffDir[i])
+  //sort the different directions that havent been added by uniqueOtherDirections
+  let sortedDiffDir = [];
+  for (let k = 0; k < uniqueOtherDirections.length; k++) {
+    for (let t = 0; t < diffDir.length; t++) {
+      if (uniqueOtherDirections[k].equals(diffDir[t])){
+        sortedDiffDir.push(diffDir[t]);
+      }
+
+    }
   }
+
+  
+  
+  
+  //add the different directions
+  for (let i = 0; i < sortedDiffDir.length; i++){
+    directions.push(sortedDiffDir[i])
+  }
+
+  //Go through differences one more time in case there are anything missing directions
+  let finalDiffDir = [];
+  for (let i = 0; i < allDirections.length; i++) {
+    let isItThere = false;
+    for (let j = 0; j < directions.length; j++) {
+      if (allDirections[i].equals(directions[j])){
+        isItThere = true;
+      }
+    }
+    if (isItThere === false) {
+      finalDiffDir.push(allDirections[i]);
+    }
+  }
+  for (let i = 0; i < finalDiffDir.length; i++){
+    directions.push(finalDiffDir[i])
+  }
+  
+  
   //logging.info(`Ship-${ship.id} at ${ship.position} direction order: ${directions}`);
   return directions;
 }
@@ -212,7 +311,7 @@ function moveAwayFromSelf(gameMap, ship) {
 //Go to favorite one
 //WE will process these later
 function finalMove(gameMap, ship, dropoff, collide) {
-  let directions = viableDirections(gameMap, ship, dropoff.position, collide);
+  let directions = viableDirections(gameMap, ship, [dropoff.position], collide);
   return directions;
 }
 
@@ -220,7 +319,7 @@ function finalMove(gameMap, ship, dropoff, collide) {
 //Other ship must have more halite than us by a good deal
 //There must be friendlies nearby (to pick up the collision aftermath)
 //Search in radius of possible collision location (other ship location), if there are at least 2 friends and and they outnumber enemy, go for it
-function worthAttacking(gameMap, ship, oship) {
+function worthAttacking(gameMap, ship, oship, absoluteWorth) {
   let possibleCollisonPos = oship.position;
   
   //attempt to detect where collision will occur;
@@ -236,8 +335,12 @@ function worthAttacking(gameMap, ship, oship) {
   if (thatStructure !== null && thatStructure.owner !== ship.owner) {
     return false;
   }
-  
-  if(1.5 * ship.haliteAmount < oship.haliteAmount) {
+  //if absoluteWorth is true, we attack otehrship if we get an absolute advantage in terms of net halite,used for final return
+  let ratio = 1.5;
+  if (absoluteWorth) {
+    ratio = 1;
+  }
+  if(ratio * ship.haliteAmount < oship.haliteAmount) {
     let shipsNearby = search.shipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
     let friendlyNearby = shipsNearby.friendly.length;
     
@@ -274,7 +377,7 @@ function returnShip(gameMap, player, ship, ships) {
   if (distanceToNearestDropoffWhenReturning <= 2 && oship !== null && oship.owner !== ship.owner){
     avoidEnemy = false;
   }
-  let directions = viableDirections(gameMap, ship, ships[id].targetDestination, avoidEnemy);
+  let directions = viableDirections(gameMap, ship, [ships[id].targetDestination], avoidEnemy);
   return directions;
 }
 

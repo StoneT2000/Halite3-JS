@@ -39,7 +39,7 @@ function findNextMiningPosition(gameMap, player, ship, range) {
         let distanceToDropoff = nearestDropoffAndDist.distance; //Number of turns it takes to return back to dropoff
         let distanceToPos = gameMap.calculateDistance(ship.position, pos); //Number of turns it takes to reach new position
         let totalHaliteMoveCost = 0;
-        let costToMoveToNewPos = costToMoveThere(gameMap, ship, pos); //Add the cost of going from currentPos to possible Mining position
+        let costToMoveToNewPos = costToMoveThere(gameMap, ship.position, pos); //Add the cost of going from currentPos to possible Mining position
         let localMaxHaliteRate = -1000;
         let turnsSpent = distanceToPos + distanceToDropoff;
         let localTurnsSpent = 0;
@@ -70,13 +70,13 @@ function findNextMiningPosition(gameMap, player, ship, range) {
             }
 
             let haliteLeft = gameMap.get(pos).haliteAmount - haliteCollected;
-            let costToGoBack = costToMoveThere(gameMap, ship, nearestDropoff.position, haliteLeft);
+            let costToGoBack = costToMoveThere(gameMap, pos, nearestDropoff.position, haliteLeft);
             
             //totalHaliteMoveCostNow = costToGoBack + costToMoveToNewPos;
             //netHaliteCollected = haliteCollected - totalHaliteMoveCostNow;
             
             let netHalite = haliteCollected - costToGoBack - costToMoveToNewPos;
-            let haliteRate = (netHaliteCollected)/(turnsSpent + k);
+            let haliteRate = (netHalite)/(turnsSpent + k);
             if (netHalite > maxPotential) {
               maxPotential = netHalite;
               omp = pos;
@@ -136,7 +136,7 @@ function findNextMiningPosition(gameMap, player, ship, range) {
 
 
 //In the next 6 turns, find most optimal place to go
-function nextMiningPosition(gameMap, player, ship, range){
+function nonextMiningPosition(gameMap, player, ship, range){
   let omp = ship.position; //optimal mining position
   let possiblePositions = search.circle(gameMap, ship.position, range);
   let shipShouldReturn = false;
@@ -154,14 +154,16 @@ function nextMiningPosition(gameMap, player, ship, range){
     
   }
   else {
-    currentCargo + currentHaliteCollected;
+    currentCargo += currentHaliteCollected;
   }
   let nearestDropoffAndDist = search.findNearestDropoff(gameMap, player, ship.position, true);
   let nearestDropoff = nearestDropoffAndDist.nearest;
   let distanceToDropoff = nearestDropoffAndDist.distance;
-  let maxHaliteRate = currentCargo/(numTurns)
+  let maxHaliteRate = currentCargo/(numTurns+distanceToDropoff)
   //logging.info(`Ship-${ship.id}: costToPos:0, collects: ${currentHaliteCollected} at ${ship.position} in ${numTurns} turns of mining`);
-
+  logging.info(`Ship-${ship.id}: costToPos:${0}, collects: ${currentCargo} at ${omp} in ${numTurns} turns of mining; rate: ${maxHaliteRate}`);
+  
+  
   for (let i = 0; i < possiblePositions.length; i++) {
     let pos = possiblePositions[i]
     let gameTile = gameMap.get(pos);
@@ -177,14 +179,21 @@ function nextMiningPosition(gameMap, player, ship, range){
       let haliteRate = -1000;
       
       
-      let costToPos = costToMoveThere(gameMap, ship, pos);
+      //let nearestDropoffAndDist2 = search.findNearestDropoff(gameMap, player, ship.position, true);
+      //let nearestDropoff2 = nearestDropoffAndDist.nearest;
+      //let distanceToDropoff2 = nearestDropoffAndDist.distance;
+      
+      let costToPos = costToMoveThere(gameMap, ship.position, pos);
       let haliteCargo = ship.haliteAmount;
       let haliteCargoThere = haliteCargo - costToPos;
       
       let haliteCollectedThere = halitePotential(gameMap, pos, turnsMining);
       
       if (haliteCargoThere + haliteCollectedThere >= 1000) {
-        turnsSpent = turnsToOverfill(gameMap, haliteCargoThere, pos, gameMap.get(pos).haliteAmount, 0);
+        let realMiningTurns = turnsToOverfill(gameMap, haliteCargoThere, pos, gameMap.get(pos).haliteAmount, 0);
+        
+        logging.info(`Ship-${ship.id} will over fill in ${realMiningTurns} turns when allowed to mine for ${turnsMining} turns`);
+        turnsMining = realMiningTurns;
         haliteCollectedThere = 1000 - haliteCargoThere;
         haliteCargoThere = 1000;
       }
@@ -193,17 +202,18 @@ function nextMiningPosition(gameMap, player, ship, range){
       }
       //HaliteCargoThere is the current halite cargo after mining
       let haliteLeftThere = gameMap.get(pos).haliteAmount - haliteCollectedThere;
-      let costBackToOriginalPos = costToMoveThere(gameMap, ship, pos, haliteLeftThere);
+      let costBackToOriginalPos = costToMoveThere(gameMap, ship.position, pos, haliteLeftThere);
       
       let netHalite = haliteCollectedThere - costBackToOriginalPos - costToPos;
       
-      haliteRate = (haliteCargoThere - costBackToOriginalPos) / turnsSpent;
+      haliteRate = (haliteCargoThere - costBackToOriginalPos) / (turnsMining + distanceToPos*2 + distanceToDropoff);
       
       if(haliteRate > maxHaliteRate) {
         maxHaliteRate = haliteRate;
         omp = pos;
+        logging.info(`Best choice so far: Ship-${ship.id}:`);
       }
-      //logging.info(`Ship-${ship.id}: costToPos:${costToPos}, collects: ${haliteCollectedThere} at ${pos} in ${turnsMining} turns of mining`);
+      logging.info(`Ship-${ship.id}: costToPos:${costToPos}, new cargo: ${haliteCargoThere - costBackToOriginalPos} at ${pos} in ${turnsMining} turns of mining; rate: ${haliteRate}`);
       /*
       for (let k = 0; k <= 5; k++) {
         
@@ -250,9 +260,80 @@ function nextMiningPosition(gameMap, player, ship, range){
   
   }
   if (shipShouldReturn === true) {
-    return {status: 'return'};
+    //return {status: 'return'};
   }
-  return {status: 'mine', position: omp};
+  
+  return omp;
+  //return {status: 'mine', position: omp};
+}
+
+function nextMiningPosition(gameMap, player, ship, range){
+  let omp = ship.position;
+  let sortedPositionsAndRatiosGood = [];
+  let sortedPositionsAndRatiosBad = [];
+  let sortedPositions =[];
+  let possiblePositions = search.circle(gameMap, ship.position, range);
+  let haliteHere = gameMap.get(ship.position).haliteAmount;
+  if (haliteHere === 0) {
+    haliteHere = 0.0001;
+  }
+  let highestRatio = -1;
+  
+  let origNearestDropoffAndDist = search.findNearestDropoff(gameMap, player, ship.position, true);
+  let origCostBackToDropoff = costToMoveThere(gameMap, ship.position, origNearestDropoffAndDist.nearest.position);
+  //haliteHere -= origCostBackToDropoff;
+  
+  for (let i = 0; i < possiblePositions.length; i++) {
+    let pos = possiblePositions[i]
+    let gameTile = gameMap.get(pos);
+    let distanceToPos = gameMap.calculateDistance(ship.position, pos);
+    if (!gameTile.isOccupied && !gameTile.hasStructure){
+      let nearestDropoffAndDist = search.findNearestDropoff(gameMap, player, pos, true);
+      let nearestDropoff = nearestDropoffAndDist.nearest;
+      let distanceToDropoff = nearestDropoffAndDist.distance;
+      let costToPos = costToMoveThere(gameMap, ship.position, pos);
+      let costBackToDropoff = costToMoveThere(gameMap, pos, nearestDropoff.position);
+      
+      
+      
+      let haliteThere = gameMap.get(pos).haliteAmount;
+      let ratio = haliteThere/ ((distanceToPos+1) * haliteHere);
+      //logging.info(`Ship-${ship.id} halite at ${pos}: ${haliteThere}, haliteHere:${haliteHere}, ratio: ${ratio}`);
+      haliteThere -= costToPos;
+      //haliteThere -= costBackToDropoff;
+      
+      //store all positions and ratios
+      
+      if (haliteThere > ((distanceToPos+1) * haliteHere)) {
+        sortedPositionsAndRatiosGood.push({position:pos, ratio:ratio});
+        /*
+        if (ratio > highestRatio){
+          highestRatio = ratio;
+          omp = pos;
+        }
+        */
+      }
+      else {
+        sortedPositionsAndRatiosBad.push({position:pos, ratio:ratio});
+      }
+    }
+  }
+  sortedPositionsAndRatiosBad.sort(function(a,b){
+    return b.ratio - a.ratio;
+  });
+  sortedPositionsAndRatiosGood.sort(function(a,b){
+    return b.ratio - a.ratio;
+  });
+  
+  for (let i = 0; i < sortedPositionsAndRatiosGood.length; i++) {
+    sortedPositions.push(sortedPositionsAndRatiosGood[i].position);
+  }
+  sortedPositions.push(ship.position);
+  for (let i = 0; i < sortedPositionsAndRatiosBad.length; i++) {
+    sortedPositions.push(sortedPositionsAndRatiosBad[i].position);
+  }
+  //logging.info(`Ship-${ship.id} halite at ${omp}: ${gameMap.get(omp).haliteAmount} is ${gameMap.calculateDistance(ship.position, omp)} away, haliteHere:${haliteHere}`);
+  return sortedPositions;
 }
 
 //Finds halite rate
@@ -277,16 +358,16 @@ function turnsToOverfill(gameMap, currentHalite, pos, haliteBelow, turnNum) {
 }
 
 //Returns the amount of halite needed for the ship using unsafeDirections to navigate to reach the targetPos with consideration of which direction is cheaper
-function costToMoveThere(gameMap, ship, targetPos, haliteBelow){
+function costToMoveThere(gameMap, startPos, targetPos, haliteBelow){
   //logging.info(`Ship-${ship.id}:Calculating totalhalitecost`);
-  let currentPosition = ship.position;
+  let currentPosition = startPos;
   
   //If ship is on target position, no halite cost to move there
   if (currentPosition.equals(targetPos)){
     return 0;
   }
   
-  let totalHaliteCost = Math.floor(gameMap.get(ship.position).haliteAmount * moveCostPercent);
+  let totalHaliteCost = Math.floor(gameMap.get(currentPosition).haliteAmount * moveCostPercent);
   
   //use the argument haliteBelow to predict future costs. Supposing that the halite below is going to be different than what it is now due to mining
   if (haliteBelow) {

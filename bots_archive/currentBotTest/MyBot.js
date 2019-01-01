@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Dec-24v2');
+  await game.ready('ST-Bot-Dec-26v2');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -233,7 +233,7 @@ game.initialize().then(async () => {
       }
     }
     /*
-    if (localHaliteCount >= hlt.constants.DROPOFF_COST/2) {
+    if (localHaliteCount >= hlt.constants.DROPOFF_COST - 200) {
       buildDropoffs = true;
     }
     */
@@ -245,7 +245,7 @@ game.initialize().then(async () => {
     let shipsThatAreBuilding = []; //array of ships that are trying to build a dropoff
     let otherShips = []; //all other ships
     let prioritizedShips = []; //the prioritized array of ships in which movements and decisions should be made
-    
+    let shipsThatAreMiningStill = []; //ships that are mining in their current position
     //Some unit preprocession stuff
     for (const ship of me.getShips()){
       let id = ship.id;
@@ -260,6 +260,7 @@ game.initialize().then(async () => {
           ships[id].distanceLeftToDestination = 0;
         }
         ships[id].mode = 'mine';
+        ships[id].mode2 = '';
         ships[id].targetDropoffId = -1;
       }
       
@@ -283,6 +284,9 @@ game.initialize().then(async () => {
         shipsThatAreBuilding.push(ship);
         shipsDesignatedToBuild += 1;
       }
+      else if (ships[id].mode2 === 'miningStill') {
+        shipsThatAreMiningStill.push(ship);
+      }
       else {
         if (ships[id].mode === 'goingToBuildDropoff'){
           shipsDesignatedToBuild += 1;
@@ -300,6 +304,9 @@ game.initialize().then(async () => {
     }
     for (let i = 0; i < shipsThatArePerformingFinalReturn.length; i++) {
       prioritizedShips.push(shipsThatArePerformingFinalReturn[i]);
+    }
+    for (let i = 0; i < shipsThatAreMiningStill.length; i++) {
+      prioritizedShips.push(shipsThatAreMiningStill[i]);//or instead, give a list of directions based on mining spot
     }
     for (let i = 0; i < shipsThatAreReturning.length; i++) {
       prioritizedShips.push(shipsThatAreReturning[i]);
@@ -341,6 +348,7 @@ game.initialize().then(async () => {
       possibleDropoffSpots.sort(function(a,b){
         return b.halite - a.halite;
       })
+      let designatedABuilder = false;
       let nextDropoffSpot = possibleDropoffSpots[0];
       //IMPROVEMENT: Slightly repetitive to search again as it was done already when going through the entire map to find ideal dropoff locations
       let possibleShipPositions = search.circle(gameMap, nextDropoffSpot.position, maxDropoffBuildDistance);
@@ -351,46 +359,57 @@ game.initialize().then(async () => {
         if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
           //then designate that ship to build the dropoff
           if (ships[thatShip.id].mode !== 'goingToBuildDropoff'){
-            ships[thatShip.id].mode = 'goingToBuildDropoff';
-            shipsDesignatedToBuild += 1;
-            ships[thatShip.id].targetDestination = nextDropoffSpot.position;
-            logging.info(`Ship-${thatShip.id} is designated to build dropoff at ${nextDropoffSpot.position}`)
-            designatedDropoffBuildPositions.push(nextDropoffSpot.position);
-            //after designating a ship, get a couple other ships to come
+            let haliteCargoThere = thatShip.haliteAmount - mining.costToMoveThere(gameMap, thatShip, nextDropoffSpot.position)
+            if (haliteCargoThere < 0) {
+              haliteCargoThere = 0;
+            }
+            let haliteAvailable = haliteCargoThere + gameMap.get(nextDropoffSpot.position).haliteAmount + localHaliteCount;
+            logging.info(`Ship-${thatShip.id}: will have ${haliteAvailable} to build with`)
+            if (haliteAvailable >= hlt.constants.DROPOFF_COST) {
+              ships[thatShip.id].mode = 'goingToBuildDropoff';
+              shipsDesignatedToBuild += 1;
+              ships[thatShip.id].targetDestination = nextDropoffSpot.position;
+              logging.info(`Ship-${thatShip.id} is designated to build dropoff at ${nextDropoffSpot.position}`)
+              designatedDropoffBuildPositions.push(nextDropoffSpot.position);
+              designatedABuilder = true;
+              //after designating a ship, get a couple other ships to come
+            }
             
             
             break;
           }
         }
       }
-      let possibleOtherShipPositions = search.circle(gameMap, nextDropoffSpot.position, 20);
-      //Find other ships to tag along the designated ship
-      let possibleShipsToTag = [];
-      for (let i = 0; i < possibleOtherShipPositions.length; i++) {
-        let possibleTileWithShip = gameMap.get(possibleOtherShipPositions[i]);
-        let thatShip = possibleTileWithShip.ship;
-        if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
-          let thatMode = ships[thatShip.id].mode;
-          if (thatMode !== 'return' && thatMode !== 'goingToBuildDropoff' && thatMode !== 'buildDropoff') {
-            possibleShipsToTag.push({ship:thatShip, distance: gameMap.calculateDistance(thatShip.position, nextDropoffSpot.position)});
+      if (designatedABuilder === true){
+        let possibleOtherShipPositions = search.circle(gameMap, nextDropoffSpot.position, 20);
+        //Find other ships to tag along the designated ship
+        let possibleShipsToTag = [];
+        for (let i = 0; i < possibleOtherShipPositions.length; i++) {
+          let possibleTileWithShip = gameMap.get(possibleOtherShipPositions[i]);
+          let thatShip = possibleTileWithShip.ship;
+          if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
+            let thatMode = ships[thatShip.id].mode;
+            if (thatMode !== 'return' && thatMode !== 'goingToBuildDropoff' && thatMode !== 'buildDropoff') {
+              possibleShipsToTag.push({ship:thatShip, distance: gameMap.calculateDistance(thatShip.position, nextDropoffSpot.position)});
+            }
           }
         }
-      }
-      //get at least 1/numofdropofss of the ships to go to the new dropoff
-      let desiredNumShips = (1/(maxDropoffs)) * numShips;
-      
-      //sort by distance, least distance first
-      possibleShipsToTag.sort(function(a,b){
-        return a.distance - b.distance;
-      })
-      for (let i = 0; i < possibleShipsToTag.length; i++) {
-        if (i < desiredNumShips) {
-          ships[possibleShipsToTag[i].ship.id].mode = 'goingToNewDropoff';
-          ships[possibleShipsToTag[i].ship.id].targetDestination = nextDropoffSpot.position;
-          //logging.info(`Ship-${possibleShipsToTag[i].ship.id} is tagged to go near ${nextDropoffSpot.position}`);
-        }
-        else {
-          break;
+        //get at least 1/numofdropofss of the ships to go to the new dropoff
+        let desiredNumShips = (1/(maxDropoffs)) * numShips;
+
+        //sort by distance, least distance first
+        possibleShipsToTag.sort(function(a,b){
+          return a.distance - b.distance;
+        })
+        for (let i = 0; i < possibleShipsToTag.length; i++) {
+          if (i < desiredNumShips) {
+            ships[possibleShipsToTag[i].ship.id].mode = 'goingToNewDropoff';
+            ships[possibleShipsToTag[i].ship.id].targetDestination = nextDropoffSpot.position;
+            //logging.info(`Ship-${possibleShipsToTag[i].ship.id} is tagged to go near ${nextDropoffSpot.position}`);
+          }
+          else {
+            break;
+          }
         }
       }
     }
@@ -545,9 +564,16 @@ game.initialize().then(async () => {
               
               break;
             case 'mine':
-              let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
-              ships[id].targetDestination = newMiningDestination;
               
+              //The original findOptimalMiningPosition thing seems to be good only for when the halite is close to the base/dropoff
+              //let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
+              //let newMiningDestination = testMining.findNextMiningPosition(gameMap, me, ship, 12);
+              let newMiningDestination = testMining.nextMiningPosition(gameMap, me, ship, 12);
+              ships[id].targetDestination = newMiningDestination;
+              //prioritize ships that are mining currently
+              if (newMiningDestination.equals(ship.position)) {
+                
+              }
               let avoid = true;
               let possibleEnemyPositions = search.circle(gameMap, ship.position, 2);
               for (let i = 0; i < possibleEnemyPositions.length; i++) {

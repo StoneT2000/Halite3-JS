@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Dec-26v1');
+  await game.ready('ST-Bot-Jan-1v1');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -93,7 +93,6 @@ game.initialize().then(async () => {
     
     
     await game.updateFrame();
-
 
    
     const commandQueue = [];
@@ -245,7 +244,6 @@ game.initialize().then(async () => {
     let shipsThatAreBuilding = []; //array of ships that are trying to build a dropoff
     let otherShips = []; //all other ships
     let prioritizedShips = []; //the prioritized array of ships in which movements and decisions should be made
-    
     //Some unit preprocession stuff
     for (const ship of me.getShips()){
       let id = ship.id;
@@ -437,8 +435,13 @@ game.initialize().then(async () => {
       }
       else if (oldMode === 'goingToBuildDropoff') {
         ships[id].mode = 'goingToBuildDropoff';
-        //someone built a structure there, go mine instead
+        //someone built a structure there or its no longer a viable position, go mine instead
         if (gameMap.get(ships[id].targetDestination).hasStructure) {
+          ships[id].mode = 'mine';
+          removePositionFromArr(ships[id].targetDestination, designatedDropoffBuildPositions);
+        }
+        let haliteInRadiusOfTarget = mining.totalHaliteInRadius(gameMap, ships[id].targetDestination, 6);
+        if (haliteInRadiusOfTarget < minHaliteAroundDropoff) {
           ships[id].mode = 'mine';
           removePositionFromArr(ships[id].targetDestination, designatedDropoffBuildPositions);
         }
@@ -557,10 +560,18 @@ game.initialize().then(async () => {
               
               break;
             case 'mine':
-              let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
-              ships[id].targetDestination = newMiningDestination;
               
+              //The original findOptimalMiningPosition thing seems to be good only for when the halite is close to the base/dropoff
+              //let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
+              //let newMiningDestination = testMining.findNextMiningPosition(gameMap, me, ship, 12);
+              let newMiningDestinations = testMining.nextMiningPosition(gameMap, me, ship, 12);
+              ships[id].targetDestination = newMiningDestinations[0];
+              //prioritize ships that are mining currently
+              if (newMiningDestinations[0].equals(ship.position)) {
+                
+              }
               let avoid = true;
+              let attackOtherShip = false;
               let possibleEnemyPositions = search.circle(gameMap, ship.position, 2);
               for (let i = 0; i < possibleEnemyPositions.length; i++) {
                 let possibleEnemyTile = gameMap.get(possibleEnemyPositions[i]);
@@ -570,14 +581,17 @@ game.initialize().then(async () => {
                 if (oship !== null && oship.owner !== ship.owner) {
                   if (movement.worthAttacking(gameMap, ship, oship)) {
                     ships[id].targetDestination = oship.position;
+                    attackOtherShip = true;
                     avoid = false;
                     break;
                   }
                 }
               }
+              if (attackOtherShip === true) {
+                newMiningDestinations.unshift(ships[id].targetDestination)
+              }
               
-              
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, avoid);
+              directions = movement.viableDirections(gameMap, ship, newMiningDestinations, avoid);
               
               //add code for determining who to attack here
               break;
@@ -606,11 +620,11 @@ game.initialize().then(async () => {
               
               //keep going to the build place as long as its still has no structure
               
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
+              directions = movement.viableDirections(gameMap, ship, [ships[id].targetDestination], true);
               //logging.info(`Ship-${ship.id} is going to build with directions: ${directions}`)
               break;
             case 'goingToNewDropoff':
-              directions = movement.viableDirections(gameMap, ship, ships[id].targetDestination, true);
+              directions = movement.viableDirections(gameMap, ship, [ships[id].targetDestination], true);
               break;
           }
         }

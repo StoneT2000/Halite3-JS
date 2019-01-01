@@ -245,4 +245,5 @@ module.exports = {
   moveCostPercent,
   findOptimalMiningPosition,
   totalHaliteInRadius,
+  costToMoveThere,
 }
