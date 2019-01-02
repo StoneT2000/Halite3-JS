@@ -322,14 +322,6 @@ function finalMove(gameMap, ship, dropoff, collide) {
 function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
   let possibleCollisonPos = oship.position;
   
-  let minFriends = 2;
-  if (ratio === 3) {
-    //4 player game implied by ratio = 3. NEVER try to collide
-    minFriends = 3;
-    return false;
-  }
-  
-  
   //attempt to detect where collision will occur;
   //Usually, the first direction is where it will occur. The times when this won't happen is when there are collisions with friendly ships detected, of which this will be off a little.
   let collisionDirections = gameMap.getUnsafeMoves(ship.position, oship.position);
@@ -357,7 +349,7 @@ function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
     }
     
     //logging.info(`Ship-${ship.id} has ${haliteCargoSpace} space in nearby ships`);
-    if (friendlyNearby >= minFriends && friendlyNearby > shipsNearby.enemy.length && oship.haliteAmount <= haliteCargoSpace){
+    if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy.length && oship.haliteAmount <= haliteCargoSpace){
       logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly.length}, e:${shipsNearby.enemy.length} at ${possibleCollisonPos}`)
       return true;
     }

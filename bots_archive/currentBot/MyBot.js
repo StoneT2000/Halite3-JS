@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-1v2.3');
+  await game.ready('ST-Bot-Jan-1v3');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -37,7 +37,7 @@ game.initialize().then(async () => {
   logging.info(`There are ${numPlayers} players`);
   if (numPlayers === 4) {
     minAverageHaliteNeeded = 60;
-    crashRatio = 3;
+    crashRatio = 2;
   }
   averageHalite = search.totalHaliteOnMap(gameMap);
   averageHalite = averageHalite / mapSize;
