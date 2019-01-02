@@ -17,7 +17,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-1v2');
+  await game.ready('ST-Bot-Jan-1v3');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -228,10 +228,19 @@ game.initialize().then(async () => {
       }
       if (buildShip === true) {
         let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
-        commandQueue.push(me.shipyard.spawn());
-        localHaliteCount -= 1000;
-        shipDesiredPositions[tempId] = [me.shipyard.position];
-        tempId -= 1; 
+        let unopenSpots = 0;
+        for (let k = 1; k < positionsToCheck.length; k++){
+          let thatShipThere = gameMap.get(positionsToCheck[k]).ship
+          if (thatShipThere !== null && thatShipThere.owner === me.shipyard.owner) {
+            unopenSpots++;
+          }
+        }
+        if (unopenSpots <= 3){
+          commandQueue.push(me.shipyard.spawn());
+          localHaliteCount -= 1000;
+          shipDesiredPositions[tempId] = [me.shipyard.position];
+          tempId -= 1; 
+        }
       }
     }
     /*
@@ -242,6 +251,7 @@ game.initialize().then(async () => {
     numShips = 0;
     let shipsDesignatedToBuild = 0; //number of ships designated to go and build dropoffs
     let shipsThatCantMove = []; //array of ships that don't have enough halite to move
+    let shipsOnStructures = []; //array of ships that are on top of friendly structures and should be moving out first
     let shipsThatAreReturning = []; //array of ships that are on return mode
     let shipsThatArePerformingFinalReturn = []; //array of ships on the final mode
     let shipsThatAreBuilding = []; //array of ships that are trying to build a dropoff
@@ -274,11 +284,16 @@ game.initialize().then(async () => {
         shipDesiredPositions[id] = [];
         shipDesiredPositions[id].push(ship.position);
       }
+
       else if (ships[id].mode === 'return') {
         shipsThatAreReturning.push(ship);
       }
+      
       else if (ships[id].mode === 'final') {
         shipsThatArePerformingFinalReturn.push(ship);
+      }
+      else if (gameMap.get(ship.position).hasStructure &&  gameMap.get(ship.position).structure.owner === me.shipyard.owner){
+        shipsOnStructures.push(ship);
       }
       else if (ships[id].mode === 'buildDropoff') {
         shipsThatAreBuilding.push(ship);
@@ -295,6 +310,9 @@ game.initialize().then(async () => {
     //Build the prioritized ships array
     for (let i = 0; i < shipsThatCantMove.length; i++) {
       prioritizedShips.push(shipsThatCantMove[i]);
+    }
+    for (let i = 0; i < shipsOnStructures.length; i++) {
+      prioritizedShips.push(shipsOnStructures[i]);
     }
     for (let i = 0; i < shipsThatAreBuilding.length; i++) {
       prioritizedShips.push(shipsThatAreBuilding[i]);
@@ -494,7 +512,7 @@ game.initialize().then(async () => {
           let numIncomingFShips = incomingFShips[dropoffId].length;
           
           //min with 8 is quite arbitrary
-          if (dropoffsSortedByHalite[i].fships + numIncomingFShips <= Math.min(numShips/maxDropoffs, 10)) {
+          if (dropoffsSortedByHalite[i].fships + numIncomingFShips <= Math.min(numShips/maxDropoffs, 8)) {
             let haliteAroundHere = mining.totalHaliteInRadius(gameMap, ship.position, 9);
             if (2 * haliteAroundHere < dropoffsSortedByHalite[i].halite) {
               ships[id].mode = 'goingToNewDropoff';
@@ -679,6 +697,7 @@ game.initialize().then(async () => {
 
         shipDirections[id] = directions;
         shipDesiredPositions[id] = [];
+        //logging.info(`Ship-${ship.id} has directions: ${directions}`)
         //logging.info(`Ship-${ship.id} at ${ship.position} direction order: ${directions}`);
         //Store the desired positions
         for (let j = 0; j < directions.length; j++) {
