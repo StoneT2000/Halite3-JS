@@ -5,7 +5,6 @@ const commands = require('./hlt/commands');
 //const util = require('./utilities');
 const movement = require('./utilities/movement.js');
 const mining = require('./utilities/mining.js');
-const testMining = require('./utilities/testMining.js');
 const search = require('./utilities/search.js');
 const game = new hlt.Game();
 
@@ -17,7 +16,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-1v3');
+  await game.ready('ST-Bot-Jan-4v1');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -371,7 +370,7 @@ game.initialize().then(async () => {
         if (thatShip !== null && thatShip.owner === me.shipyard.owner) {
           //then designate that ship to build the dropoff
           if (ships[thatShip.id].mode !== 'goingToBuildDropoff'){
-            let haliteCargoThere = thatShip.haliteAmount - mining.costToMoveThere(gameMap, thatShip, nextDropoffSpot.position)
+            let haliteCargoThere = thatShip.haliteAmount - mining.costToMoveThere(gameMap, thatShip.position, nextDropoffSpot.position)
             if (haliteCargoThere < 0) {
               haliteCargoThere = 0;
             }
@@ -588,11 +587,8 @@ game.initialize().then(async () => {
               
               break;
             case 'mine':
-              
-              //The original findOptimalMiningPosition thing seems to be good only for when the halite is close to the base/dropoff
-              //let newMiningDestination = mining.findOptimalMiningPosition(gameMap, ship, shipMineRange, shipNumFutureTurnsToCalc);
-              //let newMiningDestination = testMining.findNextMiningPosition(gameMap, me, ship, 12);
-              let newMiningDestinations = testMining.nextMiningPosition(gameMap, me, ship, 12);
+
+              let newMiningDestinations = mining.nextMiningPosition(gameMap, me, ship, 12);
               ships[id].targetDestination = newMiningDestinations[0];
               //prioritize ships that are mining currently
               if (newMiningDestinations[0].equals(ship.position)) {

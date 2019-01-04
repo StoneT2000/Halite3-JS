@@ -2,179 +2,139 @@ const hlt = require('./../hlt');
 const { Direction, Position } = require('./../hlt/positionals');
 const search = require('./search.js')
 const logging = require('./../hlt/logging')
-
+const movement = require('./movement.js')
 let extractPercent = 0.25//1/hlt.constants.EXTRACT_RATIO;
 let moveCostPercent = 0.1//1/hlt.constants.MOVE_COST_RATIO;
-function findOptimalMiningPosition(gameMap, ship, range, kTurns) {
-  
+
+//Heuristic of this mining code
+//Go to another space if the halite there > (distanceToThere + 1)*haliteHere
+
+//The halitehere and halitethere is calculated by taking the halite amount at the position. 
+//We add an extra 200% to that amount if the distance is within one unit of current position and there is inspiration available
+function nextMiningPosition(gameMap, player, ship, range){
   let omp = ship.position;
+  let sortedPositionsAndRatiosGood = [];
+  let sortedPositionsAndRatiosBad = [];
+  let sortedPositions =[];
+  let possiblePositions = search.circle(gameMap, ship.position, range);
+  let inspiredHere = inspirationHere(gameMap, player, ship.position);
+  //logging.info(`Ship-${ship.id} at ${ship.position} has inspiration: ${inspired}`)
   
   let haliteHere = gameMap.get(ship.position).haliteAmount;
-  
-  //kTurns = Number of turns to look ahead by to perform calcs
-  
-  let haliteMoveCost = haliteHere * moveCostPercent;
-  let newHalitePotential = -haliteMoveCost;
-  let currentHalitePotential = halitePotential(gameMap, ship.position, kTurns);
-  if (currentHalitePotential > 1000 - ship.haliteAmount) {
-    currentHalitePotential = 1000 - ship.haliteAmount
+  if (inspiredHere) {
+    haliteHere = haliteHere * 3;
   }
-  let id = ship.id;
-  let possibleDestinations = search.circle(gameMap, ship.position, range);
-  /*
-  let possibleDestinations1 = possibleDestinations.slice(1, 5);
-  let possibleDestinations2 = possibleDestinations.slice(5, 13);
-  let possibleDestinations3 = possibleDestinations.slice(13, 29);
-  */
-  let bestNewHaliteDestination = ship.position;
-  for (let i = 0; i < possibleDestinations.length; i++) {
-    let newTile = gameMap.get(possibleDestinations[i]);
-    let turnOffset = 2;
-    if (i === 0) {
-      turnOffset = 0;
-    }
-    else if (i <= 4){
-      turnOffset = 2;
-    }
-    else if (i <= 12) {
-      turnOffset = 4;
-    }
-    else if (i <= 28) {
-      turnOffset = 6;
-    }
-    else if (i <= 60) {
-      turnOffset = 8;
-    }
-    else if (i <= 124) {
-      turnOffset = 10;
-    }
-    else {
-      turnOffset = 10;
-    }
-    if (!newTile.isOccupied && !newTile.hasStructure){
-      //unoccupiedPositions.push(possibleDestinations[i]);
-
-      let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations[i], kTurns - turnOffset);
-      if (thisHaliteExtracted > 1000 - ship.haliteAmount) {
-        thisHaliteExtracted = 1000 - ship.haliteAmount
+  if (haliteHere === 0) {
+    haliteHere = 0.0001;
+  }
+  let highestRatio = -1;
+  
+  let origNearestDropoffAndDist = search.findNearestDropoff(gameMap, player, ship.position, true);
+  let origCostBackToDropoff = costToMoveThere(gameMap, ship.position, origNearestDropoffAndDist.nearest.position);
+  //haliteHere -= origCostBackToDropoff;
+  
+  for (let i = 0; i < possiblePositions.length; i++) {
+    let pos = possiblePositions[i]; //possible position
+    let gameTile = gameMap.get(pos); //possible game tile
+   
+    
+    if (!gameTile.isOccupied && !gameTile.hasStructure){
+      let distanceToPos = gameMap.calculateDistance(ship.position, pos);
+      let inspiredThere = false;
+      //we add inspiration only if considering nearby positions
+      if (distanceToPos <= 1) {
+        inspiredThere = inspirationHere(gameMap, player, pos);
       }
       
-      let thisHaliteStart = newTile.haliteAmount;
-      let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent;
-
-      //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
-
-      if (thisHalitePotential > newHalitePotential) {
-        newHalitePotential = thisHalitePotential;
-        bestNewHaliteDestination = possibleDestinations[i];
+      
+      let nearestDropoffAndDist = search.findNearestDropoff(gameMap, player, pos, true);
+      let nearestDropoff = nearestDropoffAndDist.nearest;
+      let distanceToDropoff = nearestDropoffAndDist.distance;
+      let costToPos = costToMoveThere(gameMap, ship.position, pos);
+      let costBackToDropoff = costToMoveThere(gameMap, pos, nearestDropoff.position);
+      
+      
+      
+      let haliteThere = gameMap.get(pos).haliteAmount;
+      if (inspiredThere) {
+        haliteThere = haliteThere * 3; //a little unaccuate as the 200% added is added to the rounded up mining amount
+      }
+      
+      let ratio = haliteThere/ ((distanceToPos+1) * haliteHere);
+      //logging.info(`Ship-${ship.id} halite at ${pos}: ${haliteThere}, haliteHere:${haliteHere}, ratio: ${ratio}`);
+      haliteThere -= costToPos;
+      //haliteThere -= costBackToDropoff;
+      
+      //store all positions and ratios
+      
+      if (haliteThere > ((distanceToPos+1) * haliteHere)) {
+        sortedPositionsAndRatiosGood.push({position:pos, ratio:ratio});
+        /*
+        if (ratio > highestRatio){
+          highestRatio = ratio;
+          omp = pos;
+        }
+        */
+      }
+      else {
+        sortedPositionsAndRatiosBad.push({position:pos, ratio:ratio});
       }
     }
   }
+  sortedPositionsAndRatiosBad.sort(function(a,b){
+    return b.ratio - a.ratio;
+  });
+  sortedPositionsAndRatiosGood.sort(function(a,b){
+    return b.ratio - a.ratio;
+  });
   
-  /*
-  if (range >= 1){
-    for (let i = 0; i < possibleDestinations1.length; i++) {
-      let newTile = gameMap.get(possibleDestinations1[i]);
-      if (!newTile.isOccupied && !newTile.hasStructure){
-        //unoccupiedPositions.push(possibleDestinations[i]);
-
-        let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations1[i], kTurns - 2);
-        let thisHaliteStart = newTile.haliteAmount;
-        let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent;
-
-        //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
-
-        if (thisHalitePotential > newHalitePotential) {
-          newHalitePotential = thisHalitePotential;
-          bestNewHaliteDestination = possibleDestinations1[i];
-        }
-      }
-    }
+  for (let i = 0; i < sortedPositionsAndRatiosGood.length; i++) {
+    sortedPositions.push(sortedPositionsAndRatiosGood[i].position);
   }
-  if (range >=2){
-    for (let i = 0; i < possibleDestinations2.length; i++) {
-      let newTile = gameMap.get(possibleDestinations2[i]);
-      if (!newTile.isOccupied && !newTile.hasStructure){
-        //unoccupiedPositions.push(possibleDestinations[i]);
-
-        let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations2[i], kTurns - 4);
-        let thisHaliteStart = newTile.haliteAmount;
-        let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent; //not accurate, we omit the cost to move over the tile we don't mine
-
-        //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
-
-        if (thisHalitePotential > newHalitePotential) {
-          newHalitePotential = thisHalitePotential;
-          bestNewHaliteDestination = possibleDestinations2[i];
-          logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
-        }
-      }
-    }
+  sortedPositions.push(ship.position);
+  for (let i = 0; i < sortedPositionsAndRatiosBad.length; i++) {
+    sortedPositions.push(sortedPositionsAndRatiosBad[i].position);
   }
-  if (range >=3){
-    for (let i = 0; i < possibleDestinations3.length; i++) {
-      let newTile = gameMap.get(possibleDestinations3[i]);
-      if (!newTile.isOccupied && !newTile.hasStructure){
-        //unoccupiedPositions.push(possibleDestinations[i]);
+  //logging.info(`Ship-${ship.id} halite at ${omp}: ${gameMap.get(omp).haliteAmount} is ${gameMap.calculateDistance(ship.position, omp)} away, haliteHere:${haliteHere}`);
+  return sortedPositions;
+}
 
-        let thisHaliteExtracted = halitePotential(gameMap, possibleDestinations3[i], kTurns - 6);
-        let thisHaliteStart = newTile.haliteAmount;
-        let thisHalitePotential = -haliteMoveCost + thisHaliteExtracted - (thisHaliteStart - thisHaliteExtracted) * extractPercent; //not accurate, we omit the cost to move over the tile we don't mine
+//Determine halite gained in these turns at this position if mining for turns: turns, optionally given the halitebelow
+function halitePotential(gameMap, position, turns, haliteBelow) {
+  let haliteHere = gameMap.get(position).haliteAmount;
+  if (haliteBelow) {
+    haliteHere = haliteBelow;
+  }
+  if (haliteBelow <= 0) {
+    return gameMap.get(position).haliteAmount;
+  }
+  if (turns === 0) {
+    return gameMap.get(position).haliteAmount - haliteHere;
+  }
+  return halitePotential(gameMap, position, turns-1, haliteHere - Math.ceil(haliteHere*0.25));
+}
 
-        //Move cost from current position, and move cost after extracting for kTurns-2 (2 due to moving)
+//Find amount of halite in surrounding area of position: position with radius: radius
+function totalHaliteInRadius(gameMap, position, radius) {
+  let positions = search.circle(gameMap, position, radius);
+  let totalHalite = 0;
+  for (let i = 0; i < positions.length; i++) {
+    totalHalite += gameMap.get(positions[i]).haliteAmount;
+  }
+  return totalHalite;
+}
 
-        if (thisHalitePotential > newHalitePotential) {
-          newHalitePotential = thisHalitePotential;
-          bestNewHaliteDestination = possibleDestinations3[i];
-          //logging.info(`Ship-${id} is mining farther at ${bestNewHaliteDestination}`);
-        }
-      }
-    }
-  }
-  */
-  //Keep mining original place if better
-  if (newHalitePotential < currentHalitePotential) {
-    omp = ship.position;
-  }
-  //No halite anywhere within 1 unit? Expand search
-  else if ((currentHalitePotential === 0 && newHalitePotential === 0) || (currentHalitePotential + newHalitePotential <= 20)) {
-    //the additional or was added without huge reason, fix it later
-    let possibleDestinationsExpanded = search.circle(gameMap, ship.position, 8);
-    let haliteThere = 0;
-    //This code can be reduced, consider only searching the latter part of the possible destinations as the former part is already checked to = 0;
-    for (let i = 0; i < possibleDestinationsExpanded.length; i++) {
-      let newTile = gameMap.get(possibleDestinationsExpanded[i]);
-      if (!newTile.isOccupied){
-        if (haliteThere < newTile.haliteAmount) {
-          haliteThere = newTile.haliteAmount;
-          bestNewHaliteDestination = possibleDestinationsExpanded[i]
-        }
-      }
-    }
-    //If no halite nearby
-    if (haliteThere === 0){
-      bestNewHaliteDestination = possibleDestinationsExpanded[Math.floor(Math.random()*(possibleDestinationsExpanded.length - 1)) + 1];
-    }
-    omp = bestNewHaliteDestination;
-  }
-  //New tile has more potential, move there;
-  else if (newHalitePotential > currentHalitePotential){
-    omp = bestNewHaliteDestination;
-  }
-  
-  return omp;
-  
-};
-function costToMoveThere(gameMap, ship, targetPos, haliteBelow){
+//The cost to move from startPos to targetPos, optinally given a changed amount of halite below the startPos
+function costToMoveThere(gameMap, startPos, targetPos, haliteBelow){
   //logging.info(`Ship-${ship.id}:Calculating totalhalitecost`);
-  let currentPosition = ship.position;
+  let currentPosition = startPos;
   
   //If ship is on target position, no halite cost to move there
   if (currentPosition.equals(targetPos)){
     return 0;
   }
   
-  let totalHaliteCost = Math.floor(gameMap.get(ship.position).haliteAmount * moveCostPercent);
+  let totalHaliteCost = Math.floor(gameMap.get(currentPosition).haliteAmount * moveCostPercent);
   
   //use the argument haliteBelow to predict future costs. Supposing that the halite below is going to be different than what it is now due to mining
   if (haliteBelow) {
@@ -213,37 +173,55 @@ function costToMoveThere(gameMap, ship, targetPos, haliteBelow){
   
 }
 
-//Determine halitePotential gained in these turns at this position
-function halitePotential(gameMap, position, turns, haliteBelow) {
-  let haliteHere = gameMap.get(position).haliteAmount;
+//Number of turns before the ship is filled to 1000
+//Returns number of turns to overfill if ship overfills, false if it doesn't overfill
+function turnsToOverfill(gameMap, currentHalite, pos, haliteBelow, turnNum) {
+  let startingHalite = gameMap.get(pos);
   if (haliteBelow) {
-    haliteHere = haliteBelow;
+    startingHalite = haliteBelow;
   }
-  if (haliteBelow <= 0) {
-    return gameMap.get(position).haliteAmount;
+  if (startingHalite === 0) {
+    return false;
   }
-  if (turns === 0) {
-    return gameMap.get(position).haliteAmount - haliteHere;
+  let turnCount = turnNum += 1;
+  let extracted = Math.ceil(startingHalite * extractPercent);
+  if (currentHalite + extracted >= 1000) {
+    return turnCount;
   }
-  return halitePotential(gameMap, position, turns-1, haliteHere - Math.ceil(haliteHere*0.25));
+  return turnsToOverfill(gameMap, currentHalite+extracted, pos, startingHalite - extracted, turnCount);
 }
 
-//Find amount of halite in surrounding area
-
-function totalHaliteInRadius(gameMap, position, radius) {
-  let positions = search.circle(gameMap, position, radius);
-  let totalHalite = 0;
-  for (let i = 0; i < positions.length; i++) {
-    totalHalite += gameMap.get(positions[i]).haliteAmount;
+//Return true/false if a player's ship at this position would be inspired or not
+function inspirationHere(gameMap, player, position) {
+  //note, if player isn't myself and is another player, we can check if the enemy would be inspired or not.
+  
+  let searchPositions = search.circle(gameMap, position, 4);
+  
+  //we could jsut use the function from search.js that tells us how many enemy ships are in radius, but rewriting it with a break statement is more efficient.
+  let enemyShips = 0;
+  for (let i = 0; i < searchPositions.length; i++) {
+    let tile = gameMap.get(searchPositions[i]);
+    let oship = tile.ship;
+    //enemy ship on this tile
+    if (oship !== null && oship.owner !== player.shipyard.owner) {
+      enemyShips += 1;
+      if (enemyShips >= 2) {
+        break;
+      }
+    }
   }
-  return totalHalite;
+  if (enemyShips >=2) {
+    return true;
+  }
+  else {
+    return false;
+  }
 }
-
 
 module.exports = {
   extractPercent,
   moveCostPercent,
-  findOptimalMiningPosition,
   totalHaliteInRadius,
   costToMoveThere,
+  nextMiningPosition,
 }
