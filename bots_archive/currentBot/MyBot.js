@@ -657,15 +657,23 @@ game.initialize().then(async () => {
       //If nearing end of game, prepare to perform calculations for final return to dropoff. Do this once, once its on its final return, let it destroy itself ontop of the dropoff instead of doing more mining if it comes back too early.
       if (meta === 'final' && ships[id].mode !== 'final') {
         
-        let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position);
+        let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
+        let turnsLeft = hlt.constants.MAX_TURNS - game.turnNumber
+        let distanceToDropoff = nearestDropoff.distance;
+        turnsLeft -= (1 + (numShips/4)/numDropoffs);
+        //logging.info(`Ship-${ship.id}: turnsleft: ${turnsLeft}, dist: ${distanceToDropoff}`)
+        if (distanceToDropoff >= turnsLeft) {
+          ships[id].mode = 'final';
+          ships[id].targetDestination = nearestDropoff.nearest.position;
+          directions = movement.finalMove(gameMap, ship, nearestDropoff.nearest, true); 
+        }
+        
         /*
         let turnsLeft = hlt.constants.MAX_TURNS - game.turnNumber;
         turnsLeft -= 10; //10 turn padding, might want to increase this due to possible collisions and inefficiency;
         let distToDropoff = gameMap.calculateDistance(ship.position, nearestDropoff.position);
         */
-        ships[id].mode = 'final';
-        ships[id].targetDestination = nearestDropoff.position;
-        directions = movement.finalMove(gameMap, ship, nearestDropoff);
+        
         
       }
       
@@ -747,8 +755,21 @@ game.initialize().then(async () => {
           //force a direction if no direction left or if there is no halite below and only direction so far is still
           if (shipDesiredPositions[id].length === 0) {
             logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
+            //if its the final part of game, let ship go to dropoff
+            
             shipDirections[id] = [Direction.Still];
             shipDesiredPositions[id] = [ship.position];
+            
+            if (meta === 'final') {
+              let panic_nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
+              let panic_nearestDropoffDist = panic_nearestDropoff.distance;
+              if (panic_nearestDropoffDist <= 1) {
+                logging.info(`PANIC: move to dropoff: ${panic_nearestDropoff.nearest.position}`)
+                shipDesiredPositions[id] = [panic_nearestDropoff.nearest.position];
+                shipDirections[id] = movement.finalMove(gameMap, ship, panic_nearestDropoff.nearest, false);
+              }
+            }
+            
           }
           
         }

@@ -310,8 +310,8 @@ function moveAwayFromSelf(gameMap, ship) {
 //Take a look at viable directions
 //Go to favorite one
 //WE will process these later
-function finalMove(gameMap, ship, dropoff, collide) {
-  let directions = viableDirections(gameMap, ship, [dropoff.position], collide);
+function finalMove(gameMap, ship, dropoff, avoid) {
+  let directions = viableDirections(gameMap, ship, [dropoff.position], avoid);
   return directions;
 }
 
@@ -366,6 +366,7 @@ function returnShip(gameMap, player, ship, ships) {
   //Last two arguments of below are true, false = avoid and dont attack
   let distanceToNearestDropoffWhenReturning = gameMap.calculateDistance(ship.position, nearestDropoff.position);
   let avoidEnemy = true;
+  //allow enemy collison if 1 away from own dropoff
   if (distanceToNearestDropoffWhenReturning <= 1){
     avoidEnemy = false;
   }

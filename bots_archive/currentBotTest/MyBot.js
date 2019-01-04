@@ -669,7 +669,7 @@ game.initialize().then(async () => {
         */
         ships[id].mode = 'final';
         ships[id].targetDestination = nearestDropoff.position;
-        directions = movement.finalMove(gameMap, ship, nearestDropoff);
+        directions = movement.finalMove(gameMap, ship, nearestDropoff, true);
         
       }
       
