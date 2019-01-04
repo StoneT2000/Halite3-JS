@@ -660,7 +660,7 @@ game.initialize().then(async () => {
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
         let turnsLeft = hlt.constants.MAX_TURNS - game.turnNumber
         let distanceToDropoff = nearestDropoff.distance;
-        turnsLeft -= (1 + (numShips/4)/numDropoffs);
+        turnsLeft -= (1 + numDropoffs + (numShips/4)/numDropoffs);
         //logging.info(`Ship-${ship.id}: turnsleft: ${turnsLeft}, dist: ${distanceToDropoff}`)
         if (distanceToDropoff >= turnsLeft) {
           ships[id].mode = 'final';

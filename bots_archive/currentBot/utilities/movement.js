@@ -328,7 +328,7 @@ function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
   if (collisionDirections.length > 0) {
     possibleCollisonPos = ship.position.directionalOffset(collisionDirections[0]);
   }
-
+  
   //if possible collision Position is over enemy structure, dont do it
   
   let thatStructure = gameMap.get(possibleCollisonPos).structure;
@@ -379,6 +379,51 @@ function returnShip(gameMap, player, ship, ships) {
   return directions;
 }
 
+//returns positions and directions that do not conflict with the given shipDesired positions and shipdirections
+function findNonConflictingMoves(gameMap, ship, shipDesiredPositions1, shipDirections1, spawnedIds) {
+  let k = 0;
+  let id = ship.id;
+  let nonConflictDesiredPositions = [];
+  let nonConflictDirections = [];
+  let conflictingDirectionsAndId = [];
+  let conflictingPositionsAndId = [];
+  let otherShipPositions = search.circle(gameMap, ship.position, 2);
+  let otherIds = [];
+  for (let p = 0; p < spawnedIds.length; p++) {
+    otherIds.push(spawnedIds[p]);
+  }
+  for (let p = 1; p < otherShipPositions.length; p++) {
+    let oship = gameMap.get(otherShipPositions[p]).ship;
+    //find other ships I own
+    if (oship !== null && oship.owner === ship.owner) {
+      //if (shipDesiredPositions1[otherId][0].equals(checkPos)){
+      otherIds.push(oship.id);
+    }
+  }
+  for (k = 0; k < shipDesiredPositions1[id].length; k++) {
+    let checkPos = shipDesiredPositions1[id][k];
+    let existConflict = false;
+    for (let otherId of otherIds) {
+
+      if (shipDesiredPositions1[otherId] !== undefined) {
+        //logging.info(`PANIC: temp position: ${shipDesiredPositions1[otherId]} for Ship-${otherId}`);
+        if (shipDesiredPositions1[otherId][0].equals(checkPos)) {
+          existConflict = true;
+          conflictingDirectionsAndId.push({direction: shipDirections1[id][k], id: otherId});
+          conflictingPositionsAndId.push({position: checkPos, id: otherId});
+          break; //break as there is an conflict
+        }
+      }
+    }
+    if (existConflict === false) {
+      //All directions and positions without conflict get pushed here.
+      //the indexes correspond with each other in shipDirections1 and shipDesiredPositions1
+      nonConflictDirections.push(shipDirections1[id][k]);
+      nonConflictDesiredPositions.push(shipDesiredPositions1[id][k]);
+    }
+  }
+  return {directions: nonConflictDirections, positions: nonConflictDesiredPositions, conflictPositionsAndId: conflictingPositionsAndId, conflictDirectionsAndId: conflictingDirectionsAndId};
+}
 
 module.exports = {
   canMove,
@@ -387,4 +432,5 @@ module.exports = {
   moveAwayFromSelf,
   worthAttacking,
   returnShip,
+  findNonConflictingMoves,
 }

@@ -16,12 +16,14 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-4v1');
+  await game.ready('ST-Bot-Jan-4v2');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
   const {gameMap, me} = game;
   
+  let avgTime = 0;
+  let totalTime = 0;
   let mapSize = gameMap.width * gameMap.height;
   let numShips = 0;
   let numDropoffs = 1;
@@ -98,6 +100,7 @@ game.initialize().then(async () => {
    
     const commandQueue = [];
 
+    let spawnedIds = []; //generated temp. Ids for new ships
     
     averageHalite = 0;
     averageHalite = search.totalHaliteOnMap(gameMap);
@@ -238,10 +241,12 @@ game.initialize().then(async () => {
           commandQueue.push(me.shipyard.spawn());
           localHaliteCount -= 1000;
           shipDesiredPositions[tempId] = [me.shipyard.position];
+          spawnedIds.push(tempId);
           tempId -= 1; 
         }
       }
     }
+    logging.info(`Spawned IDS: ${spawnedIds}`);
     /*
     if (localHaliteCount >= hlt.constants.DROPOFF_COST - 200) {
       buildDropoffs = true;
@@ -660,7 +665,7 @@ game.initialize().then(async () => {
         let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
         let turnsLeft = hlt.constants.MAX_TURNS - game.turnNumber
         let distanceToDropoff = nearestDropoff.distance;
-        turnsLeft -= (1 + (numShips/4)/numDropoffs);
+        turnsLeft -= (1 + numDropoffs/2 + (numShips/3.5)/numDropoffs);
         //logging.info(`Ship-${ship.id}: turnsleft: ${turnsLeft}, dist: ${distanceToDropoff}`)
         if (distanceToDropoff >= turnsLeft) {
           ships[id].mode = 'final';
@@ -723,50 +728,77 @@ game.initialize().then(async () => {
         //If the ship has desired positions and we don't allow it to collide with any other ship...
         if (shipDesiredPositions[id].length >= 1 && allowConflicts === false){
           
-          //Run through each of the ships desired positions until we find one of which there doesn't exist a conflict. Stop the loop if we find a viable position.
-          let k = 0;
-          let nonConflictDesiredPositions = [];
-          let nonConflictDirections = [];
-          for (k = 0; k < shipDesiredPositions[id].length; k++) {
-            let checkPos = shipDesiredPositions[id][k];
-            //logging.info(`Checking Desired Position: ${checkPos}`);
-            let existConflict = false;
-            for (otherId in shipDesiredPositions) {
-              if (otherId != id) {
-                if (shipDesiredPositions[otherId][0].equals(checkPos)){
-                  //If there are two ships trying to go to the same place, we assume that the previous ships first desired position (which has already been checked for conflicts) is their desired and priortized one. So this ship will change its direction and desired position
-                  existConflict = true;
-                  break;
-                }
-              }
-            }
-            if (existConflict === false) {
-              //All directions and positions without conflict get pushed here.
-              nonConflictDirections.push(shipDirections[id][k]);
-              nonConflictDesiredPositions.push(shipDesiredPositions[id][k]);
-            }
-          }
+          //let originalPositions = JSON.parse(JSON.stringify(shipDesiredPositions[id]));
+          //let originalDirections = JSON.parse(JSON.stringify(shipDirections[id]));
+          
+          //find the non conflicting positions and directions wanted
+          let desiredPositionsAndDirections = movement.findNonConflictingMoves(gameMap, ship, shipDesiredPositions, shipDirections, spawnedIds);
           //Set all possible non conflicting directions and positions
-          shipDesiredPositions[id] = nonConflictDesiredPositions
-          shipDirections[id] = nonConflictDirections
+          shipDesiredPositions[id] = desiredPositionsAndDirections.positions//nonConflictDesiredPositions
+          shipDirections[id] = desiredPositionsAndDirections.directions//nonConflictDirections
 
           //If after checking for conflicts, there are no desired positions we can't do anything as the function movement.viableDirections returns all cardinal directions
 
           //force a direction if no direction left or if there is no halite below and only direction so far is still
           if (shipDesiredPositions[id].length === 0) {
             logging.info(`Ship-${id} PANIC: NO AVAILABLE PLACES TO GO from ${ship.position}`);
-            //if its the final part of game, let ship go to dropoff
+            //Reload the directions that the ship wanted to go in, and check in which of those of which there are conflicts, whether the other conflicting ship has otehr available directions to move to.
+            //originalPositions;
+            //originalDirections;
             
-            shipDirections[id] = [Direction.Still];
-            shipDesiredPositions[id] = [ship.position];
+            //dandid means position and id
             
-            if (meta === 'final') {
-              let panic_nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
-              let panic_nearestDropoffDist = panic_nearestDropoff.distance;
-              if (panic_nearestDropoffDist <= 1) {
-                logging.info(`PANIC: move to dropoff: ${panic_nearestDropoff.nearest.position}`)
-                shipDesiredPositions[id] = [panic_nearestDropoff.nearest.position];
-                shipDirections[id] = movement.finalMove(gameMap, ship, panic_nearestDropoff.nearest, false);
+            let navigatedOut = false;
+            
+            
+            //dandid = directions and id
+            for (let dandid of desiredPositionsAndDirections.conflictDirectionsAndId) {
+
+              let otherId = dandid.id;
+              //try to find other pos and dirs for ship with id:otherId, given that this ship with id: id wants to go pandd.position
+              //We send a temporarily changed version of shipDesiredPositions and shipDirections, by inserting dandid.direction into it
+              let conflictPosition = ship.position.directionalOffset(dandid.direction);
+              let shipDesiredPositionsTemp = shipDesiredPositions;
+              let shipDirectionsTemp = shipDirections;
+              shipDesiredPositionsTemp[id] = [conflictPosition];
+              shipDirectionsTemp[id] = [dandid.direction];
+              
+              //find non conflicting moves for the other ship and see if it can go somewhere else
+              let otherDesiredPositionsAndDirections = movement.findNonConflictingMoves(gameMap, me.getShip(otherId), shipDesiredPositionsTemp, shipDirectionsTemp, spawnedIds)
+              
+              //if there are open places for the ship with id: otherID to go, make it go there
+              if (otherDesiredPositionsAndDirections.positions.length > 0) {
+                shipDesiredPositions = shipDesiredPositionsTemp;
+                shipDesiredPositions[otherId] = otherDesiredPositionsAndDirections.positions;
+                shipDirections = shipDirectionsTemp;
+                shipDirections[otherId] = otherDesiredPositionsAndDirections.directions;
+                
+                logging.info(`Ship-${id} PANIC: SUCCESSFULLY NAVIGATED OUT by moving to ${conflictPosition}, forcing Ship-${otherId} to move to ${otherDesiredPositionsAndDirections.positions[0]}`);
+                navigatedOut = true;
+                break;
+              }
+              
+            }
+            if (navigatedOut) {
+              
+            }
+            else {
+              logging.info(`Ship-${id} PANIC: AFTER 1 DEGREE OF CHECKING, NO PLACES TO GO FROM ${ship.position}`);
+
+
+              //if its the final part of game, let ship go to dropoff
+
+              shipDirections[id] = [Direction.Still];
+              shipDesiredPositions[id] = [ship.position];
+
+              if (meta === 'final') {
+                let panic_nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
+                let panic_nearestDropoffDist = panic_nearestDropoff.distance;
+                if (panic_nearestDropoffDist <= 1) {
+                  logging.info(`PANIC: move to dropoff: ${panic_nearestDropoff.nearest.position}`)
+                  shipDesiredPositions[id] = [panic_nearestDropoff.nearest.position];
+                  shipDirections[id] = movement.finalMove(gameMap, ship, panic_nearestDropoff.nearest, false);
+                }
               }
             }
             
@@ -795,7 +827,9 @@ game.initialize().then(async () => {
     await game.endTurn(commandQueue);
     let end = new Date().getTime();
     let time = end - start;
-    logging.info(`Turn took: ${time} ms`);
+    totalTime += time;
+    avgTime = totalTime/game.turnNumber;
+    logging.info(`Turn took: ${time} ms; AvgTime: ${avgTime}`);
   }
 });
 
