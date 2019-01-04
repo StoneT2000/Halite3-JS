@@ -16,7 +16,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-4v2');
+  await game.ready('ST-Bot-Jan-4v2.2');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -764,6 +764,10 @@ game.initialize().then(async () => {
               shipDirectionsTemp[id] = [dandid.direction];
               
               //find non conflicting moves for the other ship and see if it can go somewhere else
+              let otherShip = me.getShip(otherId);
+              if (otherShip === undefined) {
+                continue; 
+              }
               let otherDesiredPositionsAndDirections = movement.findNonConflictingMoves(gameMap, me.getShip(otherId), shipDesiredPositionsTemp, shipDirectionsTemp, spawnedIds)
               
               //if there are open places for the ship with id: otherID to go, make it go there
