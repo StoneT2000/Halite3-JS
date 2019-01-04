@@ -758,6 +758,7 @@ game.initialize().then(async () => {
               //try to find other pos and dirs for ship with id:otherId, given that this ship with id: id wants to go pandd.position
               //We send a temporarily changed version of shipDesiredPositions and shipDirections, by inserting dandid.direction into it
               let conflictPosition = gameMap.normalize(ship.position.directionalOffset(dandid.direction));
+              //shipDesiredPositions[id].push(gameMap.normalize(ship.position.directionalOffset(directions[j])));
               let shipDesiredPositionsTemp = shipDesiredPositions;
               let shipDirectionsTemp = shipDirections;
               shipDesiredPositionsTemp[id] = [conflictPosition];
