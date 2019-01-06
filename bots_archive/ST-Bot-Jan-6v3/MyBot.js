@@ -16,7 +16,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-6v4');
+  await game.ready('ST-Bot-Jan-6v3');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -108,19 +108,10 @@ game.initialize().then(async () => {
     let spawnedIds = []; //generated temp. Ids for new ships
     
     averageHalite = 0;
-    let totalHalite = search.totalHaliteOnMap(gameMap);
-    averageHalite = totalHalite / mapSize;
+    averageHalite = search.totalHaliteOnMap(gameMap);
+    averageHalite = averageHalite / mapSize;
     logging.info(`Average Halite: ${averageHalite}`);
     
-    let totalShipsThisTurn = 0;
-    for (let i = 0; i < enemyPlayers.length; i++) {
-      for (let enemyShip of enemyPlayers[i].getShips()) {
-        totalShipsThisTurn += 1;
-      }
-    }
-    for (let ourOwnShip of me.getShips()) {
-      totalShipsThisTurn += 1;
-    }
     //Calculate number of good drop off locations to put a limit on the maximum number of dropoffs so this way, the AI won't try to stack up halite to prepare to build for a dropoff that will never be built
     
     let possibleDropoffSpots = []; //Array of objects containing position and the amount of halite contained within 6 units radius of that position
@@ -225,50 +216,41 @@ game.initialize().then(async () => {
     let localHaliteCount = me.haliteAmount;
     let buildShip = false;
     let buildDropoffs = true; //whether we should let ships start to be designated to build dropoff
-    if ((game.turnNumber < 0.65 * hlt.constants.MAX_TURNS && numShips <= 1.7*Math.sqrt(mapSize)) /*averageHalite >= minAverageHaliteNeeded*/) {
-      if ((numPlayers === 4 && totalHalite / totalShipsThisTurn >= 800 && averageHalite >= minAverageHaliteNeeded) || (numPlayers === 2 && averageHalite >= minAverageHaliteNeeded)){
-        //totalHalite / totalShipsthisTurn >= 870 is optimal value that top bot seems to use
-        
-        //we stack up halite if there is a ship being designated to build. no longer use numDropoffs < maxDropoffs argument
-        if (me.haliteAmount >= hlt.constants.SHIP_COST) {
-          if (designatedDropoffBuildPositions.length >= 1) {
-            //this shouldnt be >= drop off cost, could be less due to existing halite in cargo and ground
-            if (me.haliteAmount >= hlt.constants.DROPOFF_COST + 500) {
-              buildShip = true;
-
-            }
-          }
-          else if (numDropoffs < maxDropoffs) {
-            //this way the building ship doesn't wait forever and its tagged along ships don't go all the way back to shipyard
-            if (me.haliteAmount >= hlt.constants.DROPOFF_COST - 500) {
-              buildShip = true;
-            }
-          }
-          else {
+    if ((game.turnNumber < 0.65 * hlt.constants.MAX_TURNS && numShips <= 1.5*Math.sqrt(mapSize)) && averageHalite >= minAverageHaliteNeeded) {
+      //we stack up halite if there is a ship being designated to build. no longer use numDropoffs < maxDropoffs argument
+      if (me.haliteAmount >= hlt.constants.SHIP_COST) {
+        if (designatedDropoffBuildPositions.length >= 1) {
+          //this shouldnt be >= drop off cost, could be less due to existing halite in cargo and ground
+          if (me.haliteAmount >= hlt.constants.DROPOFF_COST + 500) {
             buildShip = true;
-          }
-          if (buildShip === true) {
-            let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
-            let unopenSpots = 0;
-            for (let k = 1; k < positionsToCheck.length; k++){
-              let thatShipThere = gameMap.get(positionsToCheck[k]).ship
-              if (thatShipThere !== null && thatShipThere.owner === me.shipyard.owner) {
-                unopenSpots++;
-              }
-            }
-            if (unopenSpots <= 3){
-              commandQueue.push(me.shipyard.spawn());
-              localHaliteCount -= 1000;
-              shipDesiredPositions[tempId] = [me.shipyard.position];
-              spawnedIds.push(tempId);
-              tempId -= 1; 
-            }
+
           }
         }
-      }
-      else {
-        if (numPlayers === 4){
-          crashRatio = 3;
+        else if (numDropoffs < maxDropoffs) {
+          //this way the building ship doesn't wait forever and its tagged along ships don't go all the way back to shipyard
+          if (me.haliteAmount >= hlt.constants.DROPOFF_COST - 500) {
+            buildShip = true;
+          }
+        }
+        else {
+          buildShip = true;
+        }
+        if (buildShip === true) {
+          let positionsToCheck = search.circle(gameMap, me.shipyard.position, 1);
+          let unopenSpots = 0;
+          for (let k = 1; k < positionsToCheck.length; k++){
+            let thatShipThere = gameMap.get(positionsToCheck[k]).ship
+            if (thatShipThere !== null && thatShipThere.owner === me.shipyard.owner) {
+              unopenSpots++;
+            }
+          }
+          if (unopenSpots <= 3){
+            commandQueue.push(me.shipyard.spawn());
+            localHaliteCount -= 1000;
+            shipDesiredPositions[tempId] = [me.shipyard.position];
+            spawnedIds.push(tempId);
+            tempId -= 1; 
+          }
         }
       }
     }
