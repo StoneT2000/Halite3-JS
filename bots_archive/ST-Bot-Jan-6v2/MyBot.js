@@ -255,7 +255,9 @@ game.initialize().then(async () => {
       }
     }
     else {
-      crashRatio = 3;
+      if (numPlayers === 4){
+        crashRatio = 3;
+      }
     }
     logging.info(`Spawned IDS: ${spawnedIds}`);
     /*
