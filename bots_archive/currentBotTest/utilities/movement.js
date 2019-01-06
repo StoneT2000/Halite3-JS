@@ -269,7 +269,20 @@ function viableDirections(gameMap, ship, targetPositions, avoid) {
     directions.push(finalDiffDir[i])
   }
   
-  
+  //If the most desired direction is Direction.Still, and there are some enemies nearby, then ship is technically stuck
+  //let ship jitter by moving the direction.still back a spot
+  /*
+  if (avoid === true){
+    if (directions[0].equals(Direction.Still)){
+      let nearbyShips = search.shipsInRadius(gameMap, ship.owner, ship.position, 2);
+      if (nearbyShips.enemy.length > 0) {
+        let tempDir = directions[0]
+        directions[0] = directions[1];
+        directions[1] = tempDir;
+      }
+    }
+  }
+  */
   //logging.info(`Ship-${ship.id} at ${ship.position} direction order: ${directions}`);
   return directions;
 }
@@ -319,8 +332,12 @@ function finalMove(gameMap, ship, dropoff, avoid) {
 //Other ship must have more halite than us by a good deal
 //There must be friendlies nearby (to pick up the collision aftermath)
 //Search in radius of possible collision location (other ship location), if there are at least 2 friends and and they outnumber enemy, go for it
-function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
+function worthAttacking(gameMap, ship, oship, ratio = 1.5, requireFriends = true) {
   let possibleCollisonPos = oship.position;
+  
+  if (ratio === -1) {
+    return false;
+  }
   
   //attempt to detect where collision will occur;
   //Usually, the first direction is where it will occur. The times when this won't happen is when there are collisions with friendly ships detected, of which this will be off a little.
@@ -338,6 +355,9 @@ function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
   //if absoluteWorth is true, we attack otehrship if we get an absolute advantage in terms of net halite,used for final return
   
   if(ratio * ship.haliteAmount < oship.haliteAmount) {
+    if (requireFriends === false) {
+      return true;
+    }
     let shipsNearby = search.shipsInRadius(gameMap, ship.owner, possibleCollisonPos, 2);
     let friendlyNearby = shipsNearby.friendly.length;
     
@@ -347,10 +367,15 @@ function worthAttacking(gameMap, ship, oship, ratio = 1.5) {
         haliteCargoSpace += (1000 - shipsNearby.friendly[k].haliteAmount);
       }
     }
-    
+    let numberOfEnemiesWithSpace = shipsNearby.enemy.length;
+    for (let k = 0; k < shipsNearby.enemy.length; k++) {
+      if (shipsNearby.enemy[k].haliteAmount >= 900) {
+        numberOfEnemiesWithSpace -= 1;
+      }
+    }
     //logging.info(`Ship-${ship.id} has ${haliteCargoSpace} space in nearby ships`);
     if (friendlyNearby >= 2 && friendlyNearby > shipsNearby.enemy.length && oship.haliteAmount <= haliteCargoSpace){
-      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly.length}, e:${shipsNearby.enemy.length} at ${possibleCollisonPos}`)
+      logging.info(`Ship-${ship.id} is going to try to collide with at least 2 other friends nearby f:${shipsNearby.friendly.length}, e:${shipsNearby.enemy.length}, e with space:${numberOfEnemiesWithSpace} at ${possibleCollisonPos}`)
       return true;
     }
   }
