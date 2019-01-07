@@ -60,7 +60,7 @@ function nextMiningPosition(gameMap, player, ship, range){
         haliteThere = haliteThere * 3; //a little unaccuate as the 200% added is added to the rounded up mining amount
       }
       
-      let ratio = haliteThere / ((distanceToPos+1) * haliteHere);
+      let ratio = haliteThere/ ((distanceToPos+1) * haliteHere);
       //logging.info(`Ship-${ship.id} halite at ${pos}: ${haliteThere}, haliteHere:${haliteHere}, ratio: ${ratio}`);
       haliteThere -= costToPos;
       //haliteThere -= costBackToDropoff;
