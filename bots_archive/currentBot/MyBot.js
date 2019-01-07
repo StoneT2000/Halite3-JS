@@ -198,7 +198,7 @@ game.initialize().then(async () => {
     //DETERMINE STRATEGIES:
     //let ext = mining.extractPercent;
     //logging.info(`Extract Percent: ${ext}`);
-    if (game.turnNumber >= 0.85 * hlt.constants.MAX_TURNS) {
+    if (game.turnNumber >= 0.875 * hlt.constants.MAX_TURNS) {
        meta = 'final';
     }
     
@@ -226,8 +226,13 @@ game.initialize().then(async () => {
     let buildShip = false;
     let buildDropoffs = true; //whether we should let ships start to be designated to build dropoff
     if ((game.turnNumber < 0.65 * hlt.constants.MAX_TURNS && numShips <= 1.7*Math.sqrt(mapSize)) /*averageHalite >= minAverageHaliteNeeded*/) {
-      if ((numPlayers === 4 && totalHalite / totalShipsThisTurn >= 800 && averageHalite >= minAverageHaliteNeeded) || (numPlayers === 2 && averageHalite >= minAverageHaliteNeeded)){
-        //totalHalite / totalShipsthisTurn >= 870 is optimal value that top bot seems to use
+      //we tried copying the top bot using the below code
+      //totalHalite / totalShipsthisTurn >= 870 is optimal value that top bot seems to use
+      //if ((numPlayers === 4 && totalHalite / totalShipsThisTurn >= 800 && averageHalite >= minAverageHaliteNeeded) || (numPlayers === 2 && averageHalite >= minAverageHaliteNeeded)){}
+      
+      
+      if (averageHalite >= minAverageHaliteNeeded){
+        
         
         //we stack up halite if there is a ship being designated to build. no longer use numDropoffs < maxDropoffs argument
         if (me.haliteAmount >= hlt.constants.SHIP_COST) {
@@ -551,7 +556,9 @@ game.initialize().then(async () => {
         //check if close enough yet
         if (ships[id].targetDestination !== null){
           let distToNewDropoff = gameMap.calculateDistance(ship.position, ships[id].targetDestination);
-          if (distToNewDropoff <= 4) {
+          
+          //7 units is distance to new dropoff before ship returns to normal mining
+          if (distToNewDropoff <= 7) {
             ships[id].mode = 'none';
             //reset its mode
           }
@@ -760,7 +767,7 @@ game.initialize().then(async () => {
               }
               else {
                 let avoidShips = false;
-                if (distanceLeftToDropoff <= 3) {
+                if (distanceLeftToDropoff <= 4) {
                   avoidShips = false;
                 }
                 else {
@@ -798,16 +805,66 @@ game.initialize().then(async () => {
           }
         if (blockDropoff === true) {
           let closestDist = 100000;
+          let mostEnemies = -1;
           let nearestEnemyDropoff;
+          let bestEnemyDropoff;
+          //decide on which dropoff to go to
           for (let k = 0; k < enemyPlayers.length; k++) {
-            let nearestEnemyDropoffTemp = search.findNearestDropoff(gameMap, enemyPlayers[k], ship.position, true);
-            if (closestDist > nearestEnemyDropoffTemp.distance) {
-              closestDist = nearestEnemyDropoffTemp.distance;
-              nearestEnemyDropoff = nearestEnemyDropoffTemp;
+            for (let enemyDropoff of enemyPlayers[k].getDropoffs()){
+              //let nearestEnemyDropoffTemp = search.findNearestDropoff(gameMap, enemyPlayers[k], ship.position, true);
+              let locationOfDropoff = enemyDropoff.position;
+              let numEnemies = search.shipsInRadius(gameMap, ship.owner, locationOfDropoff, 16).enemy.length;
+              let distToDropoff = gameMap.calculateDistance(ship.position, locationOfDropoff);
+              if (distToDropoff <= (hlt.constants.MAX_TURNS - 8) - game.turnNumber) {
+                logging.info(`Ship-${ship.id} has enough time to reach ${locationOfDropoff}, which has ${numEnemies} enemies in 16 unit radius`)
+                if (numEnemies > mostEnemies) {
+                  mostEnemies = numEnemies;
+                  bestEnemyDropoff = enemyDropoff;
+                }
+                else if (numEnemies === mostEnemies) {
+                  if (distToDropoff < gameMap.calculateDistance(ship.position, bestEnemyDropoff.position)) {
+                    mostEnemies = numEnemies;
+                    bestEnemyDropoff = enemyDropoff;
+                  }
+                }
+              }
+
+              if (closestDist > distToDropoff) {
+                closestDist = distToDropoff
+                nearestEnemyDropoff = enemyDropoff;
+              }
+            }
+            let locationOfShipyard = enemyPlayers[k].shipyard.position;
+            let numEnemiesAroundShipyard = search.shipsInRadius(gameMap, ship.owner, locationOfShipyard, 16).enemy.length;
+            
+            let distToShipyard = gameMap.calculateDistance(ship.position, locationOfShipyard);
+            if (distToShipyard <= (hlt.constants.MAX_TURNS - 8) - game.turnNumber) {
+              logging.info(`Ship-${ship.id} has enough time to reach ${locationOfShipyard}, which has ${numEnemiesAroundShipyard} enemies in 16 unit radius`)
+              if (numEnemiesAroundShipyard > mostEnemies) {
+                mostEnemies = numEnemiesAroundShipyard;
+                bestEnemyDropoff = enemyPlayers[k].shipyard;
+              }
+              else if (numEnemiesAroundShipyard === mostEnemies) {
+                if (distToShipyard < gameMap.calculateDistance(ship.position, bestEnemyDropoff.position)) {
+                  mostEnemies = numEnemiesAroundShipyard;
+                  bestEnemyDropoff = enemyPlayers[k].shipyard;
+                }
+              }
+            }
+
+            if (closestDist > distToShipyard) {
+              closestDist = distToShipyard
+              nearestEnemyDropoff = enemyPlayers[k].shipyard;
             }
           }
+          if (mostEnemies === -1) {
+            ships[id].targetDestination = nearestEnemyDropoff.position;
+          }
+          else {
+             ships[id].targetDestination = bestEnemyDropoff.position;
+          }
           //logging.info(`Ship-${ship.id} is trying to block dropoff at ${nearestEnemyDropoff.nearest.position}`)
-          ships[id].targetDestination = nearestEnemyDropoff.nearest.position;
+         
         } 
         else {
           let nearestDropoff = search.findNearestDropoff(gameMap, me, ship.position, true);
