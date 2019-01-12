@@ -5,7 +5,6 @@ const commands = require('./hlt/commands');
 //const util = require('./utilities');
 const movement = require('./utilities/movement.js');
 const mining = require('./utilities/mining.js');
-const mining2 = require('./utilities/mining2.js');
 const search = require('./utilities/search.js');
 const game = new hlt.Game();
 
@@ -17,7 +16,7 @@ game.initialize().then(async () => {
   // At this point "game" variable is populated with initial map data.
   // This is a good place to do computationally expensive start-up pre-processing.
   // As soon as you call "ready" function below, the 2 second per turn timer will start.
-  await game.ready('ST-Bot-Jan-12v1');
+  await game.ready('ST-Bot-Jan-8v1');
 
   logging.info(`My Player ID is ${game.myId}.`);
   //logging.info(`Arguments/Params: ${process.argv}`);
@@ -639,8 +638,7 @@ game.initialize().then(async () => {
               break;
             case 'mine':
 
-              let newMiningDestinations = mining.nextMiningPosition(gameMap, me, ship, 20);
-              //let newMiningDestinations = mining2.nextMiningPosition(gameMap, me, ship, 12);
+              let newMiningDestinations = mining.nextMiningPosition(gameMap, me, ship, 12);
               ships[id].targetDestination = newMiningDestinations[0];
               //prioritize ships that are mining currently
               if (newMiningDestinations[0].equals(ship.position)) {
