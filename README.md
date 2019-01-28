@@ -14,12 +14,13 @@ The bot submitted for finals is the directory bots_archive/ST-Bot-Jan-8v1
 
 ## General Structure
 There are several key parts to my bot:
-- General Structure of main file MyBot.js
-- Ship organization and coordination
+- General Structure of the Main File MyBot.js and Other Files
+- Ship Organization and Coordination
 - Mining Optimization (and using inspiration)
 - Movement and Collision Management
 - Building Dropoffs
 - Other Strategies
+- A Cheap Way to Avoid Using an BFS Algorithm
 
 Generally the bot works as follows in the main while loop:
 We calculate some key values such as numer of ships, halite density and amount of halite left.
@@ -31,6 +32,8 @@ have are ```'return', 'mine', 'leaveAnywhere', 'buildDropoff', 'final', 'goingTo
 Depending on statuses and contextual situations (e.g ships that don't have enough halite to move), each ship is then given priority in deciding where to move, e.g a ship that is stuck because it doesn't have enough halite to move, will be given priority on deciding where to move.
 
 At the very end of the while loop, we push all the relevant commands to let the bot do its magic and play.
+
+The other key files are ```movement.js```, ```search.js```, and ```mining.js```. They do exactly what you think they do, handle movement decisions, handle all searching code e.g finding ships nearby or nearest dropoff, and the mining decision code.
 
 ### Ship Organization and Coordination
 
@@ -98,9 +101,16 @@ In addition, ships also try to block enemy dropoffs and we search for the enemy 
 - Position our ship in front of the direction of the enemy dropoff where there are the most ships in that direction.
 - Never allow our ship to be over the enemy dropoff (or else if it collides, the enemy gets all the halite anyway) if there are enemies really close. This also means for a ship to be repositions on another side of the enemy dropoff, it will have to travel around the enemy dropoff.
 - Try to cover all directions and keep shifting around (seems to confuse a lot of enemy bots if we keep moving)
+
+### A Cheap Way to Avoid Using an BFS Algorithm
+
+Luckily, the Halite 3 game is on a square-tile based map with no obstacles (other than enemy ships). This means no pathing algorithms are needed (yay!) and really a BFS (Breadth First Search) algorithm is all you really need if you want a fast way to find things that are near something (which my bot constantly does in order to quickly mine halite and quickly go to the nearest dropoff etc.)
+
+But really, you don't need a BFS algorithm. Thanks to the fact that units can only move to adjacent tiles and that there are 0 obstacles, I stored a lookup table into ```search.js``` called ```manhattanDeltas```. ```manhattanDeltas[r]``` where ```r``` is the manhattan radius away from a position, returns a sorted array of relative positions within the radius ```r``` that would be normally returned by a BFS algorithm. Using a lookup table is much faster and reduces runtime.
+
 _____
 
-I probably left out some details about my bot, but since around Jan. 12, I shifted focus completely to another excellent AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
+I probably left out some details about my bot because since around Jan. 12, I shifted focus completely to another excellent AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
 
 In conclusion, the the code of my bot is basically
-If If If If If (insert a ton of for loops and more if statements) else if else if //comment #192312841231 and some random quick hacky bug fixes that I never solidified (but worked I guess)
+```If If If If If``` (insert a ton of for loops and more if statements) ```else if else if //comment #192312841231``` and some random quick hacky bug fixes that I never solidified (but worked I guess)
