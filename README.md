@@ -35,13 +35,13 @@ At the very end of the while loop, we push all the relevant commands to let the 
 ### Ship Organization and Coordination
 
 Each ship has a status and a target destination. The statuses are ```'return', 'mine', 'leaveAnywhere', 'buildDropoff', 'final', 'goingToBuildDropoff', 'blockDropoff'```
-```return``` means the ship is returning to deliver halite
-```mine``` means the ship is out to go and mine
-```leaveAnywhere``` is a status telling the ship to leave ASAP, usually because it is hogging a key position such as dropoff location
-```buildDropoff``` is a status meaning the ship is going to stay still and attempt to build a dropoff when possible
-```final``` is a status telling the ship to run its end game code, essentially returning all ships to dropoffs and shipyards as late as possible and storing all our mined halite.
-```goingToBuildDropoff``` is a status telling the ship to move to a designated (optimal) location for building a dropoff
-```blockDropoff``` is a status telling the ship to block the enemy dropoff to force them to collide into this ship and drop halite in the end game
+- ```return``` means the ship is returning to deliver halite
+- ```mine``` means the ship is out to go and mine
+- ```leaveAnywhere``` is a status telling the ship to leave ASAP, usually because it is hogging a key position such as dropoff location
+- ```buildDropoff``` is a status meaning the ship is going to stay still and attempt to build a dropoff when possible
+- ```final``` is a status telling the ship to run its end game code, essentially returning all ships to dropoffs and shipyards as late as possible and storing all our mined halite.
+- ```goingToBuildDropoff``` is a status telling the ship to move to a designated (optimal) location for building a dropoff
+- ```blockDropoff``` is a status telling the ship to block the enemy dropoff to force them to collide into this ship and drop halite in the end game
 
 Each ship is looped through and each ship makes a decision on its most desired directions or adjacent positions to move to.
 This leads to the problem of prioritization. Which ship takes priority in choosing a desired direction, which then other ships cannot take or else they will collide?
@@ -61,7 +61,10 @@ This prioritization in my opinion not only ensures unwanted friendly collisions 
 
 My code for this is probably the most fatal flaw in my bot and its inability to beat other bots in high mining efficiency, even those ranked below it. I'm not proud of it, but the heuristic I used for determining the best mining spot the ship should go towards is the following
 
-For each tile within a manhattan radius of 20, calculate a ratio ```A``` where ```A = halite at that tile / ((distance to that tile  + 1.5) * halite at tile ship is on)```
+For each tile within a manhattan radius of 20, calculate a ratio ```A``` where 
+
+```A = halite at that tile / ((distance to that tile  + 1.5) * halite at tile ship is on)```
+
 The ```halite at that tile``` is then subtracted by the cost to go that position by moving to discourage bots from moving too far away and losing all their halite along the way.
 
 If there is inspiration on that tile, we multiply the halite at that tile by 3 in accordance to the inspiration mechanic. I only checked and put inspiration as a factor when searching for mining locations if the manhattan distance to the location is ≤ 1. This probably could have been improved but I was afraid any farther would cause my bot to end up chasing the enemy a lot more often than mining.
@@ -95,3 +98,6 @@ In addition, ships also try to block enemy dropoffs and we search for the enemy 
 - Position our ship in front of the direction of the enemy dropoff where there are the most ships in that direction.
 - Never allow our ship to be over the enemy dropoff (or else if it collides, the enemy gets all the halite anyway) if there are enemies really close. This also means for a ship to be repositions on another side of the enemy dropoff, it will have to travel around the enemy dropoff.
 - Try to cover all directions and keep shifting around (seems to confuse a lot of enemy bots if we keep moving)
+_____
+
+I probably left out some details about my bot, but since around Jan. 12, I shifted focus completely to another great AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
