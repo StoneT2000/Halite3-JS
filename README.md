@@ -112,5 +112,5 @@ _____
 
 I probably left out some details about my bot because since around Jan. 12, I shifted focus completely to another excellent AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
 
-In conclusion, the the code of my bot is basically
+In conclusion, the code of my bot is basically
 ```If If If If If``` (insert a ton of for loops and more if statements) ```else if else if //comment #192312841231``` and some random quick hacky bug fixes that I never solidified (but worked I guess)
