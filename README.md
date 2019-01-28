@@ -37,7 +37,7 @@ At the very end of the while loop, we push all the relevant commands to let the 
 Each ship has a status and a target destination. The statuses are ```'return', 'mine', 'leaveAnywhere', 'buildDropoff', 'final', 'goingToBuildDropoff', 'blockDropoff'```
 - ```return``` means the ship is returning to deliver halite
 - ```mine``` means the ship is out to go and mine
-- ```leaveAnywhere``` is a status telling the ship to leave ASAP, usually because it is hogging a key position such as dropoff location
+- ```leaveAnywhere``` is a status telling the ship to leave ASAP, usually because it is hogging a key position such as a friendly dropoff
 - ```buildDropoff``` is a status meaning the ship is going to stay still and attempt to build a dropoff when possible
 - ```final``` is a status telling the ship to run its end game code, essentially returning all ships to dropoffs and shipyards as late as possible and storing all our mined halite.
 - ```goingToBuildDropoff``` is a status telling the ship to move to a designated (optimal) location for building a dropoff
@@ -100,4 +100,7 @@ In addition, ships also try to block enemy dropoffs and we search for the enemy 
 - Try to cover all directions and keep shifting around (seems to confuse a lot of enemy bots if we keep moving)
 _____
 
-I probably left out some details about my bot, but since around Jan. 12, I shifted focus completely to another great AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
+I probably left out some details about my bot, but since around Jan. 12, I shifted focus completely to another excellent AI competition, <a href="http://battlecode.org/">MIT Battlecode</a>
+
+In conclusion, the the code of my bot is basically
+If If If If If (insert a ton of for loops and more if statements) else if else if //comment #192312841231 and some random quick hacky bug fixes that I never solidified (but worked I guess)
