@@ -1,29 +1,25 @@
-# Starter Kit
+# Halite 3 Bot
 
-## Halite III starter kit components
-* MyBot.{extension}, a starter bot outline
-* /hlt directory, which contains modifiable helper functions for your bot
-* A Halite executable that enables local playtesting of your bot
-* The scripts run_game.bat (Windows) and run_game.sh (MacOS, Linux)
+This is my bot I submitted for Halite 3 hosted by Two Sigma. I ranked #X globally, and #X out of highschool students
 
-## Testing your bot locally
-* Run run_game.bat (Windows) and run_game.sh (MacOS, Linux) to run a game of Halite III. By default, these scripts run a game of your MyBot.py bot vs. itself.  You can modify the board size, map seed, and the opponents of test games using the CLI.
+I wrote this in Java Script (Oops!).
 
-## CLI
-The Halite executable comes with a command line interface (CLI). Run `$ ./halite --help` to see a full listing of available flags.
+Obviously JavaScript has a lot of limitations, no memory management (dynamic arrays are kind of slow?), but to be fair for this tournament, runtime was never an issue for my bot. On my MacBook air, my bot consistently took up less than 100ms of runtime per turn.
 
-## Submitting your bot
-* Zip your MyBot.{extension} file and /hlt directory together.
-* Submit your zipped file here: https://halite.io/play-programming-challenge
+I primarily chose to use JS to write my bot because by leaving out all the specifics regarding memory management, types etc., I could easily implement new models and strategies.
 
-## Compiling your bot on our game servers
-* Your bot has `10 minutes` to install dependencies and compile on the game server.
-* You can run custom commands to set up your bot by including an `install.sh` file alongside `MyBot.{ext}`. This file will be executed and should be a Bash shell script. You must include the shebang line at the top: `#!/bin/bash`.
-  * For Python, you may install packages using pip, but you may not install to the global package directory. Instead, install packages as follows: `python3.6 -m pip install --system --target . numpy`
-* Some languages don't use the `MyBot.{ext}` convention. Exceptions include:
-  * Rust: a Cargo.toml in the root will be detected as Rust. Your bot will compile with `cargo rustc`.
-  * Swift: a Package.swift in the root will be detected as Swift. Your bot will compile with `swift build`.
-  * Haskell: You may upload a MyBot.hs, or you may upload a `stack.yaml`, in which case your bot will compile with `stack build`.
-  * Elixir: Upload a mix.exs. Your bot will compile with `mix deps.get` followed by `mix escript.build`.
-  * Clojure: Upload a project.clj. Your bot will compile with `lein uberjar`.
-  * .NET: Upload a MyBot.csproj or MyBot.fsproj. Your bot will compile with `dotnet restore` followed with `dotnet build`.
+I will discuss the specifics of my code in this README file, and a general overview and reflections about Halite 3 and my bot (a postmortem) will be released soon on my github page.
+
+## General Structure
+There are several key parts to my bot:
+- Movement and Collision Management
+- Mining Optimization (and using inspiration)
+- Building Dropoffs
+- ...
+
+### Movement and Collision Management
+This was crucial and was what made my initial bot jump from a rank of around 600 to top 300.
+
+The navigation function provided by the starter kits work, but are too simple and are not efficient enough as it does not allow ships to move to spaces that other ships previously occupied but no longer occupy.
+
+Generally, each ship based on a collection of code for other parts of the bot (mining, building dropoffs, and some other micro management strategies), will determine it's most favorable direction to move towards. Using these directions, the bot stores the most desired position of the ship. When looping through the next ship in the bot's array of ships, that ship will also have its own desired directions and positions, but it will first check with all the previous ships' desired positions and if there are conflicts, this ship will not move in that direction.
