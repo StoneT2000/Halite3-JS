@@ -1,6 +1,6 @@
 # Halite 3 Bot
 
-This is my bot I submitted for <a href='https://halite.io'>Halite 3</a> hosted by Two Sigma. I ranked <a href='https://halite.io/user/?user_id=8011'>#65 globally</a>, and <a href='https://halite.io/programming-competition-leaderboard?level=High%20School'>#5 out of highschool students</a>
+This is my bot I submitted for <a href='https://halite.io'>Halite 3</a> hosted by Two Sigma. I ranked <a href='https://halite.io/user/?user_id=8011'>#66 globally</a>, and <a href='https://halite.io/programming-competition-leaderboard?level=High%20School'>#5 out of highschool students</a>
 
 I wrote this in JavaScript (Oops!).
 
@@ -8,7 +8,7 @@ Obviously JavaScript has a lot of limitations, no memory management (dynamic arr
 
 I primarily chose to use JS to write my bot because by leaving out all the specifics regarding memory management, types etc., I could easily implement new models and strategies.
 
-I will discuss the specifics of my code in this README file, and a general overview + reflections about Halite 3 and my bot (a postmortem) will be released soon on my github page.
+I will discuss the specifics of my code in this README file, and a general overview + reflections about Halite 3 and my bot (a postmortem) is posted <a href="http://stonet2000.github.io/postmortem"></a>
 
 The bot submitted for finals is the directory bots_archive/ST-Bot-Jan-8v1
 
