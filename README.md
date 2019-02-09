@@ -8,7 +8,7 @@ Obviously JavaScript has a lot of limitations, no memory management (dynamic arr
 
 I primarily chose to use JS to write my bot because by leaving out all the specifics regarding memory management, types etc., I could easily implement new models and strategies.
 
-I will discuss the specifics of my code in this README file, and a general overview + reflections about Halite 3 and my bot (a postmortem) is posted <a href="http://stonet2000.github.io/postmortem"></a>
+I will discuss the specifics of my code in this README file, and a general overview + reflections about Halite 3 and my bot (a postmortem) is posted <a href="http://stonet2000.github.io/postmortem">here.</a>
 
 The bot submitted for finals is the directory bots_archive/ST-Bot-Jan-8v1
 
