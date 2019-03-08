@@ -1,6 +1,6 @@
 # Halite 3 Bot
 
-This is my bot I submitted for <a href='https://halite.io'>Halite 3</a> hosted by Two Sigma. I ranked <a href='https://halite.io/user/?user_id=8011'>#66 globally</a>, and <a href='https://halite.io/programming-competition-leaderboard?level=High%20School'>#5 out of highschool students</a>
+This is my bot I submitted for <a href='https://halite.io'>Halite 3</a> hosted by Two Sigma. I ranked <a href='https://2018.halite.io/user/?user_id=8011'>#66 globally</a>, and <a href='https://2018.halite.io/programming-competition-leaderboard?level=High%20School'>#5 out of highschool students</a>
 
 I wrote this in JavaScript (Oops!).
 
